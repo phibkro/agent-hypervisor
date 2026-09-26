@@ -10,7 +10,7 @@ task needs through an object-capability algebra. It is to agents what a hypervis
 they run, what they can touch, and when they stop.
 
 ```mermaid
-flowchart LR
+flowchart TD
   O[Owner] -->|projects, grants, answers| CP[Control plane]
   CP -->|one per session| SB[Sandbox microVM]
   SB --> H[Harness: omp, Claude Code, ...]

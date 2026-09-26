@@ -13,8 +13,9 @@
  * Usage: bun scripts/artifacts.ts [--skip-alloy]
  */
 import { $ } from 'bun';
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+import { verticalLayout } from './puml-layout';
 
 const docs = resolve(import.meta.dir, '..');
 const repo = resolve(docs, '..');
@@ -73,9 +74,20 @@ export type DiagramKind = 'context-map' | 'context-map-components' | 'bounded-co
 
 export interface Diagram {
   file: string;
+  /** Dark-theme variant, relative to the same directory. */
+  dark?: string;
+  /** Natural width in CSS pixels, so the page can keep small text legible on narrow screens. */
+  width?: number;
   kind: DiagramKind;
   context?: string;
   name: string;
+}
+
+/** Width of an SVG in CSS pixels (PlantUML writes px, Graphviz pt). */
+function svgWidth(file: string): number | undefined {
+  const m = /<svg[^>]*?\swidth="([\d.]+)(px|pt)?"/.exec(readFileSync(file, 'utf8'));
+  if (!m) return undefined;
+  return Math.round(Number(m[1]) * (m[2] === 'pt' ? 4 / 3 : 1));
 }
 
 /** Context Mapper names its outputs <model>_<part>.puml; turn that into something addressable. */
@@ -111,19 +123,51 @@ async function contextMapper(t: { cm: string; plantuml: string }) {
   await $`${t.cm} generate -i ${cml} -g context-map -o ${out}`.quiet();
   await $`${t.cm} generate -i ${cml} -g plantuml -o ${out}`.quiet();
 
-  // The graphical context map is an SVG already; PlantUML sources become SVGs.
-  const pumls = readdirSync(out).filter((f) => f.endsWith('.puml'));
-  await $`java -jar ${t.plantuml} -tsvg -charset UTF-8 -o ${svgOut} ${pumls.map((f) => join(out, f))}`.quiet();
+  // PlantUML sources become SVGs twice: light into svgOut, dark (PlantUML's --dark-mode) into svgOut/dark.
+  // Re-flowed top to bottom for narrow screens first (see puml-layout.ts); the originals stay in `out`.
+  const laidOut = join(out, 'vertical');
+  mkdirSync(laidOut, { recursive: true });
+  const pumls = readdirSync(out)
+    .filter((f) => f.endsWith('.puml'))
+    .map((f) => {
+      const target = join(laidOut, f);
+      writeFileSync(target, verticalLayout(readFileSync(join(out, f), 'utf8')));
+      return target;
+    });
+  const darkOut = join(svgOut, 'dark');
+  mkdirSync(darkOut, { recursive: true });
+  await $`java -jar ${t.plantuml} -tsvg -charset UTF-8 -o ${svgOut} ${pumls}`.quiet();
+  await $`java -jar ${t.plantuml} -tsvg -charset UTF-8 --dark-mode -o ${darkOut} ${pumls}`.quiet();
+
   // The PlantUML version of the context map would collide with the graphical one.
-  const cmPuml = join(svgOut, 'agent-hypervisor_ContextMap.svg');
-  const graphical = join(out, 'agent-hypervisor_ContextMap.svg');
-  if (existsSync(cmPuml)) await $`mv ${cmPuml} ${join(svgOut, 'agent-hypervisor_ContextMap_puml.svg')}`.quiet();
-  await $`cp ${graphical} ${join(svgOut, 'agent-hypervisor_ContextMap.svg')}`.quiet();
+  for (const dir of [svgOut, darkOut]) {
+    const cmPuml = join(dir, 'agent-hypervisor_ContextMap.svg');
+    if (existsSync(cmPuml)) renameSync(cmPuml, join(dir, 'agent-hypervisor_ContextMap_puml.svg'));
+  }
+  // The graphical context map is a Graphviz graph without colours of its own, so both variants
+  // come from the same .gv with Graphviz defaults set per theme (same layout in both).
+  let gv = readFileSync(join(out, 'agent-hypervisor_ContextMap.gv'), 'utf8');
+  // Layout hint for narrow screens: rank Secrets above AgentWork, so the map reads as one column
+  // (Authority, then Isolation and Secrets, then AgentWork) instead of three contexts side by side.
+  if (gv.includes('"Secrets"') && gv.includes('"AgentWork"')) {
+    gv = gv.replace(/\}\s*$/, '"Secrets" -> "AgentWork" ["style"="invis"]\n}\n');
+  }
+  const cmName = 'agent-hypervisor_ContextMap.svg';
+  await $`dot -Tsvg -o ${join(svgOut, cmName)} < ${new Response(gv)}`.quiet();
+  const fg = '#E5E5E5';
+  const bg = '#1B1B1B'; // PlantUML's --dark-mode background
+  const darkGv = gv.replaceAll('bgcolor="white"', `bgcolor="${bg}"`).replaceAll('<table ', `<table color="${fg}" `);
+  await $`dot -Tsvg -Gbgcolor=${bg} -Ncolor=${fg} -Nfontcolor=${fg} -Ecolor=${fg} -Efontcolor=${fg} -o ${join(darkOut, cmName)} < ${new Response(darkGv)}`.quiet();
 
   const diagrams = readdirSync(svgOut)
     .filter((f) => f.endsWith('.svg'))
     .map((f) => classify(f.replace(/\.svg$/, ''), 'svg'))
     .filter((d): d is Diagram => d !== null)
+    .map((d) => ({
+      ...d,
+      width: svgWidth(join(svgOut, d.file)),
+      ...(existsSync(join(darkOut, d.file)) ? { dark: `dark/${d.file}` } : {}),
+    }))
     .sort((a, b) => a.file.localeCompare(b.file));
   return diagrams;
 }

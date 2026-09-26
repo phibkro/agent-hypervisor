@@ -12,6 +12,11 @@ Diagrams and model-checking results are generated at build time from the models 
 
 A model that fails `cm validate`, or an Alloy check with an unexpected outcome, fails the build.
 
+Every diagram is rendered twice, light and `dark/` (PlantUML `--dark-mode`, Graphviz with dark defaults), and the
+page shows the one matching the theme. Before rendering, `scripts/puml-layout.ts` re-flows Context Mapper's
+PlantUML top to bottom (sections stacked, members in two columns, Smetana layout) so diagrams stay narrow; on a
+phone a diagram is never shrunk below 70% of its natural size, and its card scrolls sideways instead.
+
 ```sh
 bun install
 bun run dev          # generates diagrams on first run (skips Alloy), then vite dev on :3000/docs

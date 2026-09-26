@@ -22,6 +22,8 @@ import alloy from '@/generated/alloy.json';
 type DiagramKind = 'context-map' | 'context-map-components' | 'bounded-context' | 'aggregate' | 'lifecycle' | 'subdomain' | 'use-cases';
 interface Diagram {
   file: string;
+  dark?: string;
+  width?: number;
   kind: DiagramKind;
   context?: string;
   name: string;
@@ -66,14 +68,38 @@ function Missing({ what }: { what: string }) {
   );
 }
 
+/**
+ * On a phone, shrinking a wide diagram to the screen makes its text unreadable. Diagrams are shown at their
+ * natural size at most, and never below `minScale` of it; below that the card scrolls sideways instead.
+ */
+const minScale = 0.7;
+
+function DiagramImage({ src, alt, width }: { src: string; alt: string; width?: number }) {
+  const style = width ? { width: '100%', maxWidth: width, minWidth: Math.round(width * minScale) } : undefined;
+  return <img src={src} alt={alt} loading="lazy" style={style} className="mx-auto block h-auto max-w-full" />;
+}
+
 function Figure({ diagram, caption, alt }: { diagram: Diagram; caption?: ReactNode; alt: string }) {
   const src = assetUrl(diagram.file);
+  const card = 'block w-full cursor-zoom-in overflow-x-auto rounded-xl border p-2 sm:p-4';
   return (
     <figure className="not-prose my-6">
-      {/* Generated diagrams have a white canvas; keep it in dark mode for legibility. */}
-      <OpenSvg src={src} className="block w-full cursor-zoom-in overflow-x-auto rounded-xl border bg-white p-4" title="Open full size">
-        <img src={src} alt={alt} loading="lazy" className="mx-auto h-auto max-w-full" />
-      </OpenSvg>
+      {diagram.dark ? (
+        <>
+          {/* Light and dark renders of the same diagram; Fumadocs puts class="dark" on <html>. */}
+          <OpenSvg src={src} className={`${card} bg-white dark:hidden`} title="Open full size">
+            <DiagramImage src={src} alt={alt} width={diagram.width} />
+          </OpenSvg>
+          <OpenSvg src={assetUrl(diagram.dark)} className={`${card} hidden bg-[#1B1B1B] dark:block`} title="Open full size">
+            <DiagramImage src={assetUrl(diagram.dark)} alt={alt} width={diagram.width} />
+          </OpenSvg>
+        </>
+      ) : (
+        // No dark render: keep the white canvas in dark mode for legibility.
+        <OpenSvg src={src} className={`${card} bg-white`} title="Open full size">
+          <DiagramImage src={src} alt={alt} width={diagram.width} />
+        </OpenSvg>
+      )}
       <figcaption className="mt-2 text-center text-sm text-fd-muted-foreground">
         {caption ?? alt} <span className="opacity-70">· generated from <a className="underline" href={`${repoUrl}/${domain.model}`}>{domain.model}</a></span>
       </figcaption>

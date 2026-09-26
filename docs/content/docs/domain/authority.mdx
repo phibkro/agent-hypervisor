@@ -12,7 +12,7 @@ narrow what it holds. Sessions never delegate to each other; that is why a fork 
 project.
 
 ```mermaid
-flowchart LR
+flowchart TD
   O[Owner] -->|delegate| P[Project]
   P -->|delegate| S1[Session A]
   P -->|delegate| S2[Session B, a fork of A]
