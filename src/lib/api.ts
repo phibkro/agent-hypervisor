@@ -1,14 +1,52 @@
 import { useEffect } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
+import type { FormSchema } from './elicitation'
+
+/** Mirrors server/status.ts: needs-you > running > active > inactive > archived. */
+export type SessionStatus = 'needs-you' | 'running' | 'active' | 'inactive' | 'archived'
 
 export interface ThreadSummary {
   id: string
+  projectId: string | null
   title: string | null
   cwd: string
+  harnessSessionId: string | null
+  origin: 'created' | 'imported'
   createdAt: number
   updatedAt: number
-  running: boolean
-  pendingApprovals: number
+  lastActivityAt: number
+  archivedAt: number | null
+  status: SessionStatus
+  pending: number
+}
+
+export interface Project {
+  id: string
+  name: string
+  root: string
+  createdAt: number
+}
+
+export interface ExternalSession {
+  sessionId: string
+  cwd: string
+  title: string | null
+  updatedAt: string | null
+  maybeLive: boolean
+}
+
+export interface PendingPrompt {
+  id: string
+  threadId: string
+  runId: string
+  message: string
+  schema: FormSchema
+  createdAt: number
+}
+
+export interface Attention {
+  pending: Array<PendingApproval>
+  prompts: Array<PendingPrompt>
 }
 
 export interface PendingApproval {
@@ -44,11 +82,20 @@ export function useLiveEvents() {
   useEffect(() => {
     const es = new EventSource('/api/events')
     es.addEventListener('ready', () => void qc.invalidateQueries())
-    es.addEventListener('threads', () => void qc.invalidateQueries({ queryKey: ['threads'] }))
-    es.addEventListener('approvals', (e) => {
+    es.addEventListener('threads', () => {
+      void qc.invalidateQueries({ queryKey: ['threads'] })
+      void qc.invalidateQueries({ queryKey: ['projects'] })
+    })
+    es.addEventListener('attention', (e) => {
       const { threadId } = JSON.parse((e as MessageEvent).data) as { threadId: string }
       void qc.invalidateQueries({ queryKey: ['approvals', threadId] })
     })
-    return () => es.close()
+    // Status is partly a function of time (active → inactive after 15 min of
+    // quiet), which no event announces; a slow refetch keeps the labels true.
+    const tick = setInterval(() => void qc.invalidateQueries({ queryKey: ['threads'] }), 60_000)
+    return () => {
+      es.close()
+      clearInterval(tick)
+    }
   }, [qc])
 }

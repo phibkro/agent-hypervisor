@@ -4,6 +4,8 @@ import { fetchServerSentEvents, useChat } from '@tanstack/ai-react'
 import type { UIMessage } from '@tanstack/ai-react'
 import { Streamdown } from 'streamdown'
 import {
+  Archive,
+  ArchiveRestore,
   ArrowUp,
   Brain,
   Check,
@@ -20,8 +22,10 @@ import { Badge } from '@/components/ui/badge'
 import { Textarea } from '@/components/ui/textarea'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { ChatHeader } from '@/components/chat-header'
+import { PromptCard } from '@/components/prompt-card'
+import type { PromptReply } from '@/components/prompt-card'
 import { getJson, postJson } from '@/lib/api'
-import type { Decision, PendingApproval, ThreadSummary } from '@/lib/api'
+import type { Attention, Decision, PendingApproval, ThreadSummary } from '@/lib/api'
 import { cn } from '@/lib/utils'
 
 type Part = UIMessage['parts'][number]
@@ -228,16 +232,17 @@ export function ChatView({ threadId }: { threadId: string }) {
   })
   const thread = threads?.find((t) => t.id === threadId)
 
-  const { data: approvals } = useQuery({
+  const { data: attention } = useQuery({
     queryKey: ['approvals', threadId],
-    queryFn: () => getJson<{ pending: Array<PendingApproval> }>(`/api/approvals?threadId=${threadId}`),
+    queryFn: () => getJson<Attention>(`/api/approvals?threadId=${threadId}`),
   })
-  const pending = approvals?.pending ?? []
+  const pending = attention?.pending ?? []
+  const prompts = attention?.prompts ?? []
 
   useEffect(() => {
     const el = scrollRef.current
     if (el && pinned.current) el.scrollTop = el.scrollHeight
-  }, [messages, pending.length])
+  }, [messages, pending.length, prompts.length])
 
   const send = () => {
     const text = input.trim()
@@ -257,6 +262,18 @@ export function ChatView({ threadId }: { threadId: string }) {
     await qc.invalidateQueries({ queryKey: ['approvals', threadId] })
   }
 
+  const reply = async (id: string, r: PromptReply): Promise<string | null> => {
+    const res = await postJson('/api/prompts', { id, ...r })
+    await qc.invalidateQueries({ queryKey: ['approvals', threadId] })
+    return res.ok ? null : await res.text()
+  }
+
+  const archived = thread?.status === 'archived'
+  const setArchived = async (value: boolean) => {
+    await postJson('/api/archive', { threadId, archived: value })
+    await qc.invalidateQueries({ queryKey: ['threads'] })
+  }
+
   return (
     <div className="flex h-full min-h-0 flex-col">
       <ChatHeader title={thread?.title ?? 'New session'}>
@@ -265,6 +282,19 @@ export function ChatView({ threadId }: { threadId: string }) {
           <Badge variant="secondary" className="gap-1">
             <LoaderCircle className="size-3 animate-spin" /> working
           </Badge>
+        )}
+        {thread?.origin === 'imported' && <Badge variant="outline">imported</Badge>}
+        {thread && (
+          <Button
+            size="icon"
+            variant="ghost"
+            className="size-8"
+            onClick={() => setArchived(!archived)}
+            aria-label={archived ? 'Unarchive' : 'Archive'}
+            title={archived ? 'Unarchive' : 'Archive (new activity brings it back)'}
+          >
+            {archived ? <ArchiveRestore /> : <Archive />}
+          </Button>
         )}
       </ChatHeader>
 
@@ -283,7 +313,7 @@ export function ChatView({ threadId }: { threadId: string }) {
           {turns.map((m, i) => (
             <Message key={m.id} message={m} live={working && i === turns.length - 1} />
           ))}
-          {working && messages.at(-1)?.role === 'user' && (
+          {working && messages.at(-1)?.role === 'user' && pending.length === 0 && prompts.length === 0 && (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <LoaderCircle className="size-4 animate-spin" /> Starting omp…
             </div>
@@ -298,6 +328,9 @@ export function ChatView({ threadId }: { threadId: string }) {
       </div>
 
       <div className="mx-auto w-full max-w-3xl space-y-2 px-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+        {prompts.map((p) => (
+          <PromptCard key={p.id} prompt={p} onReply={(r) => reply(p.id, r)} />
+        ))}
         {pending.map((a) => (
           <ApprovalCard key={a.id} approval={a} onDecide={(d) => decide(a.id, d)} />
         ))}

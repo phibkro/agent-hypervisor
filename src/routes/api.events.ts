@@ -16,15 +16,15 @@ export const Route = createFileRoute('/api/events')({
             const send = (event: string, data: unknown) =>
               controller.enqueue(enc.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`))
             const onThreads = () => send('threads', {})
-            const onApprovals = (threadId: string) => send('approvals', { threadId })
+            const onAttention = (threadId: string) => send('attention', { threadId })
             const ping = setInterval(() => controller.enqueue(enc.encode(': ping\n\n')), 25_000)
             bus.on('threads', onThreads)
-            bus.on('approvals', onApprovals)
+            bus.on('attention', onAttention)
             send('ready', {})
             cleanup = () => {
               clearInterval(ping)
               bus.off('threads', onThreads)
-              bus.off('approvals', onApprovals)
+              bus.off('attention', onAttention)
             }
             request.signal.addEventListener('abort', () => {
               cleanup()

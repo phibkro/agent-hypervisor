@@ -15,6 +15,7 @@
     "node": ">=22.13"
   },
   "dependencies": {
+    "@agentclientprotocol/sdk": "0.25.1",
     "@tanstack/ai": "0.61.0",
     "@tanstack/ai-acp": "0.3.17",
     "@tanstack/ai-client": "0.35.1",

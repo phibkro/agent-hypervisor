@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { listApprovals, listGrants, resolveApproval } from '../server/core'
+import { listApprovals, listGrants, listPrompts, resolveApproval } from '../server/core'
 import type { Decision } from '../server/core'
 
 const DECISIONS = new Set<Decision>(['once', 'session', 'deny'])
@@ -10,7 +10,7 @@ export const Route = createFileRoute('/api/approvals')({
       GET: async ({ request }) => {
         const threadId = new URL(request.url).searchParams.get('threadId')
         if (!threadId) return new Response('threadId is required', { status: 400 })
-        return Response.json({ pending: listApprovals(threadId), grants: listGrants(threadId) })
+        return Response.json({ pending: listApprovals(threadId), prompts: listPrompts(threadId), grants: listGrants(threadId) })
       },
       POST: async ({ request }) => {
         const body = (await request.json().catch(() => null)) as { id?: unknown; decision?: unknown } | null

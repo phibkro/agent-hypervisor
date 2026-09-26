@@ -12,9 +12,13 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as AppIndexRouteImport } from './routes/_app/index'
 import { Route as ApiApprovalsRouteImport } from './routes/api.approvals'
+import { Route as ApiArchiveRouteImport } from './routes/api.archive'
 import { Route as ApiCancelRouteImport } from './routes/api.cancel'
 import { Route as ApiChatRouteImport } from './routes/api.chat'
 import { Route as ApiEventsRouteImport } from './routes/api.events'
+import { Route as ApiExternalRouteImport } from './routes/api.external'
+import { Route as ApiProjectsRouteImport } from './routes/api.projects'
+import { Route as ApiPromptsRouteImport } from './routes/api.prompts'
 import { Route as ApiThreadsRouteImport } from './routes/api.threads'
 import { Route as ApiTranscriptRouteImport } from './routes/api.transcript'
 import { Route as AppTThreadIdRouteImport } from './routes/_app/t/$threadId'
@@ -33,6 +37,11 @@ const ApiApprovalsRoute = ApiApprovalsRouteImport.update({
   path: '/api/approvals',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiArchiveRoute = ApiArchiveRouteImport.update({
+  id: '/api/archive',
+  path: '/api/archive',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiCancelRoute = ApiCancelRouteImport.update({
   id: '/api/cancel',
   path: '/api/cancel',
@@ -46,6 +55,21 @@ const ApiChatRoute = ApiChatRouteImport.update({
 const ApiEventsRoute = ApiEventsRouteImport.update({
   id: '/api/events',
   path: '/api/events',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiExternalRoute = ApiExternalRouteImport.update({
+  id: '/api/external',
+  path: '/api/external',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiProjectsRoute = ApiProjectsRouteImport.update({
+  id: '/api/projects',
+  path: '/api/projects',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPromptsRoute = ApiPromptsRouteImport.update({
+  id: '/api/prompts',
+  path: '/api/prompts',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiThreadsRoute = ApiThreadsRouteImport.update({
@@ -67,18 +91,26 @@ const AppTThreadIdRoute = AppTThreadIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
   '/api/approvals': typeof ApiApprovalsRoute
+  '/api/archive': typeof ApiArchiveRoute
   '/api/cancel': typeof ApiCancelRoute
   '/api/chat': typeof ApiChatRoute
   '/api/events': typeof ApiEventsRoute
+  '/api/external': typeof ApiExternalRoute
+  '/api/projects': typeof ApiProjectsRoute
+  '/api/prompts': typeof ApiPromptsRoute
   '/api/threads': typeof ApiThreadsRoute
   '/api/transcript': typeof ApiTranscriptRoute
   '/t/$threadId': typeof AppTThreadIdRoute
 }
 export interface FileRoutesByTo {
   '/api/approvals': typeof ApiApprovalsRoute
+  '/api/archive': typeof ApiArchiveRoute
   '/api/cancel': typeof ApiCancelRoute
   '/api/chat': typeof ApiChatRoute
   '/api/events': typeof ApiEventsRoute
+  '/api/external': typeof ApiExternalRoute
+  '/api/projects': typeof ApiProjectsRoute
+  '/api/prompts': typeof ApiPromptsRoute
   '/api/threads': typeof ApiThreadsRoute
   '/api/transcript': typeof ApiTranscriptRoute
   '/': typeof AppIndexRoute
@@ -88,9 +120,13 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_app': typeof AppRouteWithChildren
   '/api/approvals': typeof ApiApprovalsRoute
+  '/api/archive': typeof ApiArchiveRoute
   '/api/cancel': typeof ApiCancelRoute
   '/api/chat': typeof ApiChatRoute
   '/api/events': typeof ApiEventsRoute
+  '/api/external': typeof ApiExternalRoute
+  '/api/projects': typeof ApiProjectsRoute
+  '/api/prompts': typeof ApiPromptsRoute
   '/api/threads': typeof ApiThreadsRoute
   '/api/transcript': typeof ApiTranscriptRoute
   '/_app/': typeof AppIndexRoute
@@ -101,18 +137,26 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/api/approvals'
+    | '/api/archive'
     | '/api/cancel'
     | '/api/chat'
     | '/api/events'
+    | '/api/external'
+    | '/api/projects'
+    | '/api/prompts'
     | '/api/threads'
     | '/api/transcript'
     | '/t/$threadId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/api/approvals'
+    | '/api/archive'
     | '/api/cancel'
     | '/api/chat'
     | '/api/events'
+    | '/api/external'
+    | '/api/projects'
+    | '/api/prompts'
     | '/api/threads'
     | '/api/transcript'
     | '/'
@@ -121,9 +165,13 @@ export interface FileRouteTypes {
     | '__root__'
     | '/_app'
     | '/api/approvals'
+    | '/api/archive'
     | '/api/cancel'
     | '/api/chat'
     | '/api/events'
+    | '/api/external'
+    | '/api/projects'
+    | '/api/prompts'
     | '/api/threads'
     | '/api/transcript'
     | '/_app/'
@@ -133,9 +181,13 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   AppRoute: typeof AppRouteWithChildren
   ApiApprovalsRoute: typeof ApiApprovalsRoute
+  ApiArchiveRoute: typeof ApiArchiveRoute
   ApiCancelRoute: typeof ApiCancelRoute
   ApiChatRoute: typeof ApiChatRoute
   ApiEventsRoute: typeof ApiEventsRoute
+  ApiExternalRoute: typeof ApiExternalRoute
+  ApiProjectsRoute: typeof ApiProjectsRoute
+  ApiPromptsRoute: typeof ApiPromptsRoute
   ApiThreadsRoute: typeof ApiThreadsRoute
   ApiTranscriptRoute: typeof ApiTranscriptRoute
 }
@@ -163,6 +215,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiApprovalsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/archive': {
+      id: '/api/archive'
+      path: '/api/archive'
+      fullPath: '/api/archive'
+      preLoaderRoute: typeof ApiArchiveRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/cancel': {
       id: '/api/cancel'
       path: '/api/cancel'
@@ -182,6 +241,27 @@ declare module '@tanstack/react-router' {
       path: '/api/events'
       fullPath: '/api/events'
       preLoaderRoute: typeof ApiEventsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/external': {
+      id: '/api/external'
+      path: '/api/external'
+      fullPath: '/api/external'
+      preLoaderRoute: typeof ApiExternalRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/projects': {
+      id: '/api/projects'
+      path: '/api/projects'
+      fullPath: '/api/projects'
+      preLoaderRoute: typeof ApiProjectsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/prompts': {
+      id: '/api/prompts'
+      path: '/api/prompts'
+      fullPath: '/api/prompts'
+      preLoaderRoute: typeof ApiPromptsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/threads': {
@@ -223,9 +303,13 @@ const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
 const rootRouteChildren: RootRouteChildren = {
   AppRoute: AppRouteWithChildren,
   ApiApprovalsRoute: ApiApprovalsRoute,
+  ApiArchiveRoute: ApiArchiveRoute,
   ApiCancelRoute: ApiCancelRoute,
   ApiChatRoute: ApiChatRoute,
   ApiEventsRoute: ApiEventsRoute,
+  ApiExternalRoute: ApiExternalRoute,
+  ApiProjectsRoute: ApiProjectsRoute,
+  ApiPromptsRoute: ApiPromptsRoute,
   ApiThreadsRoute: ApiThreadsRoute,
   ApiTranscriptRoute: ApiTranscriptRoute,
 }
