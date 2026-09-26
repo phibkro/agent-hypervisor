@@ -1,0 +1,14 @@
+@startuml
+
+skinparam componentStyle uml2
+
+package "'Project' Aggregate" <<Rectangle>> {
+	class Project <<(A,#fffab8) Aggregate Root>> {
+		String id
+		String name
+		List<String> resources
+	}
+}
+
+
+@enduml

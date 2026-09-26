@@ -1,0 +1,60 @@
+@startuml
+
+skinparam componentStyle uml2
+
+package "'Capability' Aggregate" <<Rectangle>> {
+	class Capability <<(A,#fffab8) Aggregate Root>> {
+		String rights
+		boolean singleUse
+		CapabilityId id
+		Principal holder
+		ResourceRef resource
+		Mode mode
+		CapabilityId derivedFrom
+		CapabilityState lifecycle
+	}
+	class CapabilityId <<(V,DarkSeaGreen) Value Object>> {
+		String value
+	}
+	class Principal <<(V,DarkSeaGreen) Value Object>> {
+		String kind
+		String id
+	}
+	class ResourceRef <<(V,DarkSeaGreen) Value Object>> {
+		String kind
+		String locator
+	}
+	enum Mode {
+		ISO
+		VAL
+		TAG
+	}
+	enum CapabilityState {
+		LIVE
+		CONSUMED
+		REVOKED
+	}
+	class CapabilityGranted <<(E,#ff9f4b) Domain Event>> {
+		CapabilityId capability
+		Principal holder
+	}
+	class CapabilityRevoked <<(E,#ff9f4b) Domain Event>> {
+		CapabilityId capability
+	}
+	class CapabilityConsumed <<(E,#ff9f4b) Domain Event>> {
+		CapabilityId capability
+	}
+}
+Capability --> CapabilityId : derivedFrom
+Capability --> Principal : holder
+CapabilityGranted --> CapabilityId : capability
+CapabilityGranted --> Principal : holder
+Capability --> ResourceRef : resource
+Capability --> CapabilityState : lifecycle
+CapabilityRevoked --> CapabilityId : capability
+Capability --> Mode : mode
+CapabilityConsumed --> CapabilityId : capability
+Capability --> CapabilityId : id
+
+
+@enduml

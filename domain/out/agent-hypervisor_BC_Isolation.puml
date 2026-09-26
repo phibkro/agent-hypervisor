@@ -4,73 +4,56 @@ skinparam componentStyle uml2
 
 package "'Sandbox' Aggregate" <<Rectangle>> {
 	class Sandbox <<(A,#fffab8) Aggregate Root>> {
-		SandboxId id
-		HostRef host
-		List<Mount> mounts
-		EgressPolicy egress
+		String id
+		String sessionId
+		String host
+		List<String> mounts
+		List<String> allowedEgress
 		SandboxState lifecycle
 	}
-	class SandboxId <<(V,DarkSeaGreen) Value Object>> {
-		String value
-	}
-	class HostRef <<(V,DarkSeaGreen) Value Object>> {
-		String hostId
-	}
-	class Mount <<(V,DarkSeaGreen) Value Object>> {
-		String hostPath
-		String guestPath
-		boolean writable
-		String capabilityId
-	}
-	class EgressPolicy <<(V,DarkSeaGreen) Value Object>> {
-		String proxyAddress
-		String allowedHosts
-	}
 	enum SandboxState {
-		PROVISIONING
 		RUNNING
 		STOPPED
 		DESTROYED
 	}
-	class SandboxProvisioned <<(E,#ff9f4b) Domain Event>> {
-		SandboxId sandbox
-		HostRef host
+	class SandboxRunning <<(E,#ff9f4b) Domain Event>> {
+		String sandbox
 	}
 	class SandboxStopped <<(E,#ff9f4b) Domain Event>> {
-		SandboxId sandbox
+		String sandbox
 	}
-	class MountAttached <<(E,#ff9f4b) Domain Event>> {
-		SandboxId sandbox
-		Mount mount
-	}
-	class MountDetached <<(E,#ff9f4b) Domain Event>> {
-		SandboxId sandbox
-		Mount mount
-	}
-	class SandboxLifecycle <<(S,DarkSeaGreen) Service>> {
-		SandboxId provision(HostRef host)
-		void ready(SandboxId sandbox)
-		void stop(SandboxId sandbox)
-		void start(SandboxId sandbox)
-		void destroy(SandboxId sandbox)
-		void attachMount(SandboxId sandbox, Mount mount)
-		void detachMount(SandboxId sandbox, Mount mount)
+	class SandboxDestroyed <<(E,#ff9f4b) Domain Event>> {
+		String sandbox
 	}
 }
-Sandbox --> HostRef : host
+package "'Host' Aggregate" <<Rectangle>> {
+	class Host <<(A,#fffab8) Aggregate Root>> {
+		String name
+		String tailnetAddress
+		boolean compute
+		boolean storage
+	}
+}
+package "'Application'" <<Rectangle>> {
+	legend left
+		This application layer contains flow definitions (visualization available via BPMN Sketch Miner).
+	end legend
+	class Provision <<(C,#3bc5e9) Command>> {
+	}
+	class StopIdle <<(C,#3bc5e9) Command>> {
+	}
+	class Stop <<(C,#3bc5e9) Command>> {
+	}
+	class Start <<(C,#3bc5e9) Command>> {
+	}
+	class Destroy <<(C,#3bc5e9) Command>> {
+	}
+}
 Sandbox --> SandboxState : lifecycle
-SandboxProvisioned --> SandboxId : sandbox
-SandboxProvisioned --> HostRef : host
-Sandbox --> SandboxId : id
-Sandbox "1" *--> "*" Mount : mounts
-MountAttached --> SandboxId : sandbox
-MountDetached --> Mount : mount
-Sandbox --> EgressPolicy : egress
-SandboxStopped --> SandboxId : sandbox
-MountAttached --> Mount : mount
-MountDetached --> SandboxId : sandbox
 legend left
-  This bounded context implements the subdomain 'Isolation'.
+  This bounded context implements the subdomain 'Isolation', which contains the following entities:
+   - Sandbox
+   - Host
 end legend
 
 

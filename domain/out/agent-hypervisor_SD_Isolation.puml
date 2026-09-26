@@ -1,0 +1,20 @@
+@startuml
+
+skinparam componentStyle uml2
+
+package "'Isolation' Supporting Domain" <<Rectangle>> {
+	class Sandbox <<(E,DarkSeaGreen) Entity>> {
+		String lifecycleState
+	}
+	class Host <<(E,DarkSeaGreen) Entity>> {
+		String name
+	}
+}
+legend left
+  This subdomain is part of the 'AgentHypervisor' domain.
+
+  Where agent work physically runs: a sandbox per session on a host, enforcing granted authority.
+end legend
+
+
+@enduml

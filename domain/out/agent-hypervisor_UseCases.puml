@@ -1,0 +1,91 @@
+@startuml
+
+skinparam componentStyle uml2
+
+"AnswerQuestion" as (AnswerQuestion)
+"DecideRequest" as (DecideRequest)
+"DelegateToSubagent" as (DelegateToSubagent)
+"ForkSession" as (ForkSession)
+"GrantAndRevoke" as (GrantAndRevoke)
+"ImportSession" as (ImportSession)
+"PauseAndResume" as (PauseAndResume)
+"ReadReplies" as (ReadReplies)
+"RequestCapability" as (RequestCapability)
+"StartSession" as (StartSession)
+"UseSecretWithoutSeeingIt" as (UseSecretWithoutSeeingIt)
+"WorkInParallel" as (WorkInParallel)
+
+"Owner" as Actor_0
+"Agent" as Actor_1
+
+left to right direction
+Actor_0 -- DecideRequest
+Actor_0 -- ForkSession
+Actor_0 -- GrantAndRevoke
+Actor_0 -- ImportSession
+Actor_0 -- PauseAndResume
+Actor_0 -- ReadReplies
+Actor_0 -- StartSession
+Actor_0 -- UseSecretWithoutSeeingIt
+Actor_0 -- WorkInParallel
+Actor_1 -- AnswerQuestion
+Actor_1 -- DelegateToSubagent
+Actor_1 -- RequestCapability
+
+note bottom of (StartSession)
+  //Feature:// start a Session in a Project
+  //Feature:// choose an AgentProfile for a Session
+  //Benefit:// an agent works on a task in its own sandbox and worktree
+end note
+note bottom of (WorkInParallel)
+  //Feature:// run a Session in a Repository
+  //Benefit:// independent tasks progress at once without overwriting each other
+end note
+note bottom of (RequestCapability)
+  //Feature:// request a Capability for a Session
+  //Benefit:// I can continue a task that needs authority the session does not hold
+end note
+note bottom of (DecideRequest)
+  //Feature:// grant a CapabilityRequest
+  //Feature:// deny a CapabilityRequest
+  //Benefit:// agents get exactly the authority a task needs, decided from any device
+end note
+note bottom of (GrantAndRevoke)
+  //Feature:// grant a Capability to a Session
+  //Feature:// revoke a Capability
+  //Benefit:// authority can change at any time, even while an agent is working
+end note
+note bottom of (UseSecretWithoutSeeingIt)
+  //Feature:// grant a Secret to a Session
+  //Feature:// use a Placeholder in a Request
+  //Benefit:// the agent can call a service without the secret entering its sandbox
+end note
+note bottom of (AnswerQuestion)
+  //Feature:// ask a Question
+  //Benefit:// I resolve ambiguity with the owner instead of guessing
+end note
+note bottom of (ForkSession)
+  //Feature:// fork a Session
+  //Feature:// choose a Turn in a Session
+  //Benefit:// I can try another approach from that point
+end note
+note bottom of (ImportSession)
+  //Feature:// import a HarnessSession to a Project
+  //Benefit:// work begun in a terminal continues here
+end note
+note bottom of (PauseAndResume)
+  //Feature:// archive a Session
+  //Feature:// resume a Session
+  //Benefit:// idle sessions cost nothing and nothing is lost
+end note
+note bottom of (ReadReplies)
+  //Feature:// read the Replies in a Session
+  //Benefit:// I can catch up on a session from my phone
+end note
+note bottom of (DelegateToSubagent)
+  //Feature:// spawn a Subagent in a Session
+  //Benefit:// I can split a task without asking for new authority
+end note
+
+
+@enduml

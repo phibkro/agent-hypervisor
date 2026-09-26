@@ -2,95 +2,60 @@
 
 skinparam componentStyle uml2
 
-package "'CapabilityRegistry' Aggregate" <<Rectangle>> {
-	class CapabilityRegistry <<(A,#fffab8) Aggregate Root>> {
-		int epoch
-		List<Capability> capabilities
-	}
-	class Capability <<(E,DarkSeaGreen) Entity>> {
-		int epoch
+package "'Capability' Aggregate" <<Rectangle>> {
+	class Capability <<(A,#fffab8) Aggregate Root>> {
+		String rights
+		boolean singleUse
 		CapabilityId id
 		Principal holder
 		ResourceRef resource
 		Mode mode
-		Rights rights
 		CapabilityId derivedFrom
+		CapabilityState lifecycle
 	}
 	class CapabilityId <<(V,DarkSeaGreen) Value Object>> {
 		String value
 	}
 	class Principal <<(V,DarkSeaGreen) Value Object>> {
+		String kind
 		String id
-		PrincipalKind kind
 	}
-	enum PrincipalKind {
-		OWNER
-		PROJECT
-		SESSION
-		ORGANISATION
+	class ResourceRef <<(V,DarkSeaGreen) Value Object>> {
+		String kind
+		String locator
 	}
 	enum Mode {
 		ISO
 		VAL
 		TAG
 	}
-	class ResourceRef <<(V,DarkSeaGreen) Value Object>> {
-		String locator
-		ResourceKind kind
-	}
-	enum ResourceKind {
-		DIRECTORY
-		HTTP_ENDPOINT
-		SECRET
-		HOST
-		SANDBOX
-	}
-	class Rights <<(V,DarkSeaGreen) Value Object>> {
-		String lattice
-		String value
+	enum CapabilityState {
+		LIVE
+		CONSUMED
+		REVOKED
 	}
 	class CapabilityGranted <<(E,#ff9f4b) Domain Event>> {
 		CapabilityId capability
 		Principal holder
 	}
-	class CapabilityAttenuated <<(E,#ff9f4b) Domain Event>> {
-		CapabilityId capability
-		CapabilityId derivedFrom
-	}
-	class CapabilitySent <<(E,#ff9f4b) Domain Event>> {
-		CapabilityId capability
-		Principal recipient
-	}
-	class CapabilityFrozen <<(E,#ff9f4b) Domain Event>> {
-		CapabilityId capability
-	}
 	class CapabilityRevoked <<(E,#ff9f4b) Domain Event>> {
-		int epoch
 		CapabilityId capability
 	}
-	class CapabilityOperations <<(S,DarkSeaGreen) Service>> {
-		CapabilityId acquire(Principal holder, ResourceRef resource, Mode mode, Rights rights)
-		CapabilityId attenuate(CapabilityId capability, Rights narrower)
-		void send(CapabilityId capability, Principal recipient)
-		void freeze(CapabilityId capability)
-		void revoke(CapabilityId capability)
-		boolean authorize(Principal holder, ResourceRef resource, Rights needed)
+	class CapabilityConsumed <<(E,#ff9f4b) Domain Event>> {
+		CapabilityId capability
 	}
 }
 package "'CapabilityRequest' Aggregate" <<Rectangle>> {
 	class CapabilityRequest <<(A,#fffab8) Aggregate Root>> {
+		String id
+		String sessionId
 		String actingAgentId
+		String rights
 		String reason
-		CapabilityRequestId id
-		Principal requester
 		ResourceRef resource
-		Rights wanted
-		RequestDecision decision
+		RequestState lifecycle
 	}
-	class CapabilityRequestId <<(V,DarkSeaGreen) Value Object>> {
-		String value
-	}
-	enum RequestDecision {
+	enum RequestState {
 		PENDING
 		GRANTED_ONCE
 		GRANTED_FOR_SESSION
@@ -99,42 +64,55 @@ package "'CapabilityRequest' Aggregate" <<Rectangle>> {
 		CANCELLED
 	}
 	class CapabilityRequested <<(E,#ff9f4b) Domain Event>> {
-		CapabilityRequestId request
-		Principal requester
+		String request
 	}
-	class CapabilityRequestDecided <<(E,#ff9f4b) Domain Event>> {
-		CapabilityRequestId request
-		RequestDecision decision
+	class RequestGranted <<(E,#ff9f4b) Domain Event>> {
+		String request
+	}
+	class RequestDenied <<(E,#ff9f4b) Domain Event>> {
+		String request
+	}
+	class RequestCancelled <<(E,#ff9f4b) Domain Event>> {
+		String request
 	}
 }
-CapabilityRequest --> RequestDecision : decision
-Capability --> Principal : holder
-CapabilityGranted --> Principal : holder
-CapabilitySent --> CapabilityId : capability
-CapabilityRequest --> ResourceRef : resource
-CapabilityAttenuated --> CapabilityId : derivedFrom
-CapabilityRequest --> Principal : requester
-Capability --> Mode : mode
-Capability --> CapabilityId : id
+package "'Application'" <<Rectangle>> {
+	legend left
+		This application layer contains flow definitions (visualization available via BPMN Sketch Miner).
+	end legend
+	class RequestCapability <<(C,#3bc5e9) Command>> {
+	}
+	class DecideRequest <<(C,#3bc5e9) Command>> {
+	}
+	class ExpireRequest <<(C,#3bc5e9) Command>> {
+	}
+	class CancelRequest <<(C,#3bc5e9) Command>> {
+	}
+	class Mint <<(C,#3bc5e9) Command>> {
+	}
+	class Revoke <<(C,#3bc5e9) Command>> {
+	}
+	class Consume <<(C,#3bc5e9) Command>> {
+	}
+}
 Capability --> CapabilityId : derivedFrom
-CapabilityRequestDecided --> CapabilityRequestId : request
-CapabilityRequestDecided --> RequestDecision : decision
-Capability --> ResourceRef : resource
-CapabilityRevoked --> CapabilityId : capability
-CapabilityRequested --> CapabilityRequestId : request
+Capability --> Principal : holder
 CapabilityGranted --> CapabilityId : capability
-ResourceRef --> ResourceKind : kind
-Capability --> Rights : rights
-CapabilityFrozen --> CapabilityId : capability
-Principal --> PrincipalKind : kind
-CapabilitySent --> Principal : recipient
-CapabilityRequest --> Rights : wanted
-CapabilityRequested --> Principal : requester
-CapabilityRegistry "1" *--> "*" Capability : capabilities
-CapabilityAttenuated --> CapabilityId : capability
-CapabilityRequest --> CapabilityRequestId : id
+CapabilityGranted --> Principal : holder
+Capability --> ResourceRef : resource
+Capability --> CapabilityState : lifecycle
+CapabilityRequest --> ResourceRef : resource
+CapabilityRevoked --> CapabilityId : capability
+CapabilityRequest --> RequestState : lifecycle
+Capability --> Mode : mode
+CapabilityConsumed --> CapabilityId : capability
+Capability --> CapabilityId : id
 legend left
-  This bounded context implements the subdomain 'AuthorityModel'.
+  This bounded context implements the subdomain 'Authority', which contains the following entities:
+   - Capability
+   - CapabilityRequest
+   - ProtectedResource
+   - Principal
 end legend
 
 

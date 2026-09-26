@@ -1,0 +1,29 @@
+@startuml
+
+skinparam componentStyle uml2
+
+REVOKED : 
+DENIED : 
+CANCELLED : 
+GRANTED_FOR_SESSION : 
+CONSUMED : 
+EXPIRED : 
+GRANTED_ONCE : 
+PENDING : 
+LIVE : 
+[*] --> PENDING : RequestCapability
+PENDING --> DENIED : DecideRequest
+PENDING --> GRANTED_FOR_SESSION : DecideRequest
+PENDING --> GRANTED_ONCE : DecideRequest
+PENDING --> EXPIRED : ExpireRequest
+PENDING --> CANCELLED : CancelRequest
+[*] --> LIVE : Mint
+LIVE --> REVOKED : Revoke
+LIVE --> CONSUMED : Consume
+
+
+legend top center
+  CapabilityRequestLifecycle State Transitions
+endlegend
+
+@enduml

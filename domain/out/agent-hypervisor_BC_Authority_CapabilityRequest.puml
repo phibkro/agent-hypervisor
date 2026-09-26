@@ -4,18 +4,15 @@ skinparam componentStyle uml2
 
 package "'CapabilityRequest' Aggregate" <<Rectangle>> {
 	class CapabilityRequest <<(A,#fffab8) Aggregate Root>> {
+		String id
+		String sessionId
 		String actingAgentId
+		String rights
 		String reason
-		CapabilityRequestId id
-		Principal requester
 		ResourceRef resource
-		Rights wanted
-		RequestDecision decision
+		RequestState lifecycle
 	}
-	class CapabilityRequestId <<(V,DarkSeaGreen) Value Object>> {
-		String value
-	}
-	enum RequestDecision {
+	enum RequestState {
 		PENDING
 		GRANTED_ONCE
 		GRANTED_FOR_SESSION
@@ -24,19 +21,19 @@ package "'CapabilityRequest' Aggregate" <<Rectangle>> {
 		CANCELLED
 	}
 	class CapabilityRequested <<(E,#ff9f4b) Domain Event>> {
-		CapabilityRequestId request
-		Principal requester
+		String request
 	}
-	class CapabilityRequestDecided <<(E,#ff9f4b) Domain Event>> {
-		CapabilityRequestId request
-		RequestDecision decision
+	class RequestGranted <<(E,#ff9f4b) Domain Event>> {
+		String request
+	}
+	class RequestDenied <<(E,#ff9f4b) Domain Event>> {
+		String request
+	}
+	class RequestCancelled <<(E,#ff9f4b) Domain Event>> {
+		String request
 	}
 }
-CapabilityRequested --> CapabilityRequestId : request
-CapabilityRequest --> RequestDecision : decision
-CapabilityRequestDecided --> CapabilityRequestId : request
-CapabilityRequestDecided --> RequestDecision : decision
-CapabilityRequest --> CapabilityRequestId : id
+CapabilityRequest --> RequestState : lifecycle
 
 
 @enduml

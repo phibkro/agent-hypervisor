@@ -1,545 +1,425 @@
 /*
- * Agent Hypervisor: domain model, draft 1.
- * Scope (MVP): one Owner > Projects > Sessions > Agents. No multi-tenancy; an Organisation
- * can later be inserted above Owner as another principal. Open questions are marked OPEN.
+ * Agent Hypervisor: domain model, draft 4 (discovery pass).
  *
- * Decided (interview round 1):
- * - The Session is the security principal; agents act inside it and are recorded for audit.
- * - A Project is a container of resources (repos, host directories, secrets, endpoints).
- * - An Agent has a reusable definition (AgentProfile) and running instances (lead, subagents).
- * - Sandbox and Session are 1:1; the sandbox suspends when the session goes inactive.
- * Decided (interview round 2):
- * - Parallel sessions on one repository each get their own worktree (iso); merging back is a separate, authorized act.
- * - The session's creator answers its capability requests.
- * Decided (round 3): single user for the MVP. The Owner holds root authority, owns every
- *   credential and answers every capability request, so no approver can lack the authority it grants.
- * Decided (round 4): merging worktrees back happens outside the system.
- * Decided (round 5):
- * - Multi-host by design (compute and storage roles), one host deployed for now.
- * - A fork carries conversation, code and grants from a chosen turn into a new session with its own worktree.
- * - Archive keeps the worktree and transcript; the VM is stopped, not snapshotted.
- * - Capabilities can be granted (mounted) and revoked (unmounted) at any time, including mid-turn.
- * - A session with a pending request never suspends; the request's own timeout ends it instead.
- * Revised: "suspend" means stop the VM and keep durable state on the host, not a memory snapshot,
- *   because Cloud Hypervisor snapshot/restore with virtio-fs mounts has open bugs (issues #6931, #8918).
- * - The agent tree is observed, best effort: recorded when a harness reports subagents.
+ * Built bottom-up from what the owner and agents do (user stories), then the nouns
+ * those stories use (subdomain entities), then the lifecycles where rules live (flows).
+ * Bounded contexts only where the language differs.
+ *
+ * MVP scope: one owner, many projects, one host (multi-host by design).
  */
+
+/* ======================================================= who does what, and why */
+
+UserStory StartSession {
+  As an "Owner"
+    I want to "start" a "Session" in a "Project"
+    I want to "choose" an "AgentProfile" for a "Session"
+  so that "an agent works on a task in its own sandbox and worktree"
+}
+
+UserStory WorkInParallel {
+  As an "Owner"
+    I want to "run" a "Session" in a "Repository"
+      so that "independent tasks progress at once without overwriting each other"
+}
+
+UserStory RequestCapability {
+  As an "Agent"
+    I want to "request" a "Capability" for a "Session"
+  so that "I can continue a task that needs authority the session does not hold"
+  and that "owner control" is promoted
+  accepting that "agent autonomy" is harmed
+}
+
+UserStory DecideRequest {
+  As an "Owner"
+    I want to "grant" a "CapabilityRequest" with its "scope"
+    I want to "deny" a "CapabilityRequest"
+  so that "agents get exactly the authority a task needs, decided from any device"
+  and that "owner control" is promoted
+  accepting that "agent throughput" is reduced
+}
+
+UserStory GrantAndRevoke {
+  As an "Owner"
+    I want to "grant" a "Capability" to a "Session"
+    I want to "revoke" a "Capability"
+  so that "authority can change at any time, even while an agent is working"
+}
+
+UserStory UseSecretWithoutSeeingIt {
+  As an "Owner"
+    I want to "grant" a "Secret" to a "Session"
+    I want to "use" a "Placeholder" in a "Request"
+  so that "the agent can call a service without the secret entering its sandbox"
+  and that "confidentiality" is promoted
+  accepting that "transparency" is harmed
+}
+
+UserStory AnswerQuestion {
+  As an "Agent"
+    I want to "ask" a "Question" with its "options"
+  so that "I resolve ambiguity with the owner instead of guessing"
+}
+
+UserStory ForkSession {
+  As an "Owner"
+    I want to "fork" a "Session" with its "conversation", "code", "grants"
+    I want to "choose" a "Turn" in a "Session"
+  so that "I can try another approach from that point"
+}
+
+UserStory ImportSession {
+  As an "Owner"
+    I want to "import" a "HarnessSession" to a "Project"
+  so that "work begun in a terminal continues here"
+}
+
+UserStory PauseAndResume {
+  As an "Owner"
+    I want to "archive" a "Session"
+    I want to "resume" a "Session"
+  so that "idle sessions cost nothing and nothing is lost"
+}
+
+UserStory ReadReplies {
+  As an "Owner"
+    I want to "read" the "Replies" in a "Session"
+  so that "I can catch up on a session from my phone"
+}
+
+UserStory DelegateToSubagent {
+  As an "Agent"
+    I want to "spawn" a "Subagent" in a "Session"
+  so that "I can split a task without asking for new authority"
+}
+
+/* ======================================================= the problem space */
+
+Domain AgentHypervisor {
+  domainVisionStatement = "Run any coding agent with exactly the authority its task needs, and supervise it from anywhere."
+
+  Subdomain AgentWork supports StartSession, WorkInParallel, ForkSession, ImportSession, PauseAndResume, ReadReplies, AnswerQuestion, DelegateToSubagent {
+    type = CORE_DOMAIN
+    domainVisionStatement = "Units of agent work: who does them, on what code, and how they branch and pause."
+    Entity Project { String name }
+    Entity Session { String title }
+    Entity Turn { int turnNumber }
+    Entity Agent { String role }
+    Entity AgentProfile { String harness String model }
+    Entity Worktree { String branch }
+    Entity Checkpoint { String commit }
+    Entity Question { String message }
+    Entity HarnessSession { String externalId }
+  }
+
+  Subdomain Authority supports RequestCapability, DecideRequest, GrantAndRevoke {
+    type = CORE_DOMAIN
+    domainVisionStatement = "Object capabilities: who holds what authority over which resource, how it is narrowed, delegated and revoked."
+    Entity Capability { String mode }
+    Entity CapabilityRequest { String reason }
+    Entity ProtectedResource { String locator }
+    Entity Principal { String kind }
+  }
+
+  Subdomain Secrets supports UseSecretWithoutSeeingIt {
+    type = CORE_DOMAIN
+    domainVisionStatement = "Secrets used by agents through placeholders, resolved only at the sandbox boundary."
+    Entity Secret { String name }
+    Entity Placeholder { String token }
+  }
+
+  Subdomain Isolation {
+    type = SUPPORTING_DOMAIN
+    domainVisionStatement = "Where agent work physically runs: a sandbox per session on a host, enforcing granted authority."
+    Entity Sandbox { String lifecycleState }
+    Entity Host { String name }
+  }
+}
+
+/* ======================================================= the solution space */
 
 ContextMap AgentHypervisorMap {
   type = SYSTEM_LANDSCAPE
   state = TO_BE
+  contains AgentWork, Authority, Secrets, Isolation
 
-  contains ProjectCatalog, AgentCatalog, SessionOrchestration, Authority, Isolation, HarnessGateway,
-           Attention, CredentialBrokerage, SessionRecord, Harnesses, ModelProviders
+  /* Authority is the shared language of permission; the others conform to its terms. */
+  Authority [U,OHS,PL] -> [D] AgentWork
+  Authority [U,OHS,PL] -> [D] Secrets
+  Authority [U,OHS,PL] -> [D] Isolation
 
-  /* The catalog owns which projects, resources and hosts exist; others refer to its ids. */
-  ProjectCatalog [U,OHS] -> [D] SessionOrchestration {
-    exposedAggregates = Project
-  }
-  ProjectCatalog [U,OHS] -> [D] Authority {
-    exposedAggregates = Project
-  }
-
-  /* Authority is the published language of permission: capabilities, rights, grants. */
-  Authority [U,OHS,PL] -> [D] SessionOrchestration {
-    exposedAggregates = CapabilityRegistry
-  }
-  Authority [U,OHS,PL] -> [D] Isolation {
-    exposedAggregates = CapabilityRegistry
-  }
-  Authority [U,OHS,PL] -> [D] CredentialBrokerage {
-    exposedAggregates = CapabilityRegistry
-  }
-  Authority [U,OHS] -> [D] Attention {
-    exposedAggregates = CapabilityRequest
-  }
-
-  AgentCatalog [S] -> [C] SessionOrchestration {
-    exposedAggregates = AgentProfile
-  }
-
-  /* Orchestration is the customer of the machinery that runs agents. */
-  Isolation [S] -> [C] SessionOrchestration {
-    exposedAggregates = Sandbox
-  }
-  HarnessGateway [S] -> [C] SessionOrchestration {
-    exposedAggregates = HarnessConnection
-  }
-  SessionOrchestration [U,OHS] -> [D] Attention {
-    exposedAggregates = Session
-  }
-  SessionOrchestration [U,PL] -> [D,CF] SessionRecord {
-    exposedAggregates = Session
-  }
-
-  /* External systems, kept behind anticorruption layers. */
-  Harnesses [U,OHS,PL] -> [D,ACL] HarnessGateway {
-    implementationTechnology = "ACP (Agent Client Protocol) over stdio; native SDKs later"
-  }
-  ModelProviders [U,OHS] -> [D,ACL] CredentialBrokerage {
-    implementationTechnology = "HTTPS egress proxy injecting credentials behind placeholders"
-  }
+  /* Work tells isolation what should run; isolation serves it. */
+  Isolation [S] -> [C] AgentWork
 }
 
-Domain AgentHypervisor {
-  domainVisionStatement = "Run any coding-agent harness under granular, provable authority, and let humans supervise it from anywhere."
-
-  Subdomain SessionLifecycle {
-    type = CORE_DOMAIN
-    domainVisionStatement = "What a unit of agent work is, how it starts, pauses, resumes, forks and ends."
-  }
-  Subdomain AuthorityModel {
-    type = CORE_DOMAIN
-    domainVisionStatement = "Capability algebra (iso, val, tag) deciding what any agent may touch, and how authority is delegated and revoked."
-  }
-  Subdomain Isolation {
-    type = CORE_DOMAIN
-    domainVisionStatement = "Per-session microVM sandboxes that enforce granted authority at the machine boundary."
-  }
-  Subdomain HumanOversight {
-    type = SUPPORTING_DOMAIN
-    domainVisionStatement = "Everything that needs a person: approvals, agent questions, notifications, from any device."
-  }
-  Subdomain HarnessAdaptation {
-    type = SUPPORTING_DOMAIN
-    domainVisionStatement = "Translate omp, Claude Code, Codex and pi into one session model."
-  }
-  Subdomain SecretHandling {
-    type = SUPPORTING_DOMAIN
-    domainVisionStatement = "Agents use credentials without ever seeing them."
-  }
-  Subdomain Audit {
-    type = SUPPORTING_DOMAIN
-    domainVisionStatement = "A complete, replayable record of what happened and who authorized it."
-  }
-  Subdomain ProjectManagement {
-    type = GENERIC_SUBDOMAIN
-    domainVisionStatement = "The owner's projects, their resources, and the hosts they live on."
-  }
-}
-
-/* ------------------------------------------------------------- ProjectCatalog */
-
-BoundedContext ProjectCatalog implements ProjectManagement {
+BoundedContext AgentWork implements AgentWork {
   type = FEATURE
-  domainVisionStatement = "The owner's projects, what each project may touch, and the hosts that hold it."
-  responsibilities = "Projects", "Project resources", "Hosts"
+  domainVisionStatement = "Sessions, their turns and agents, and the code they work on."
 
-  /* MVP: one implicit Owner (the single user). Not modelled as an aggregate; it is the
-     root principal in Authority. Multi-tenancy later adds Organisation and Member above it. */
+  Application {
+    Command StartSession
+    Command SendPrompt
+    Command EndTurn
+    Command ForkSession
+    Command ArchiveSession
+    Command ResumeSession
+    Command ImportSession
 
-  Aggregate Project {
-    Entity Project {
-      aggregateRoot
-      - ProjectId id
-      String name
-      - List<ProjectResource> resources
+    Flow SessionLifecycle {
+      command StartSession [ initiated by "Owner" ] delegates to Session [ -> ACTIVE ] emits event SessionStarted
+      command SendPrompt [ initiated by "Owner" ] delegates to Session [ ACTIVE, ARCHIVED -> RUNNING ] emits event TurnStarted
+      command EndTurn delegates to Session [ RUNNING -> ACTIVE ] emits event TurnEnded
+      command ArchiveSession [ initiated by "Owner" ] delegates to Session [ ACTIVE -> ARCHIVED ] emits event SessionArchived
+      command ResumeSession [ initiated by "Owner" ] delegates to Session [ ARCHIVED -> ACTIVE ] emits event SessionResumed
+      command ForkSession [ initiated by "Owner" ] emits event SessionForked
+      event SessionForked triggers command StartSession
+      command ImportSession [ initiated by "Owner" ] emits event SessionImported
+      event SessionImported triggers command StartSession
     }
-    ValueObject ProjectId { String value key }
-    /* A project is a container of resources; a directory on a host is one kind.
-       The project's authority over each resource is a capability it holds (see Authority). */
-    Entity ProjectResource {
-      - ProjectResourceId id
-      - ProjectResourceKind kind
-      String locator
-      - HostId host
-      String capabilityId
-    }
-    ValueObject ProjectResourceId { String value key }
-    enum ProjectResourceKind { REPOSITORY, HOST_DIRECTORY, SECRET, HTTP_ENDPOINT }
-    DomainEvent ProjectCreated { - ProjectId project }
   }
-
-  /* Multi-host by design: sandboxes run on compute hosts; worktrees, transcripts and records
-     live on storage hosts. MVP: one host with both roles. */
-  Aggregate Host {
-    Entity Host {
-      aggregateRoot
-      - HostId id
-      String name
-      String tailnetAddress
-      - List<HostRole> roles
-    }
-    ValueObject HostId { String value key }
-    enum HostRole { COMPUTE, STORAGE }
-  }
-}
-
-/* ------------------------------------------------------- SessionOrchestration */
-
-BoundedContext SessionOrchestration implements SessionLifecycle {
-  type = FEATURE
-  domainVisionStatement = "The hypervisor's scheduler: sessions, their agents, and their turns."
-  responsibilities = "Session lifecycle", "Agent tree", "Turns", "Status derivation", "Import and fork"
 
   Aggregate Session {
     Entity Session {
       aggregateRoot
       - SessionId id
-      - ProjectId project
+      String projectId
       String title
-      - Checkout checkout
-      - AgentId leadAgent
+      - Worktree worktree
+      - List<Turn> turns
       - List<Agent> agents
-      - SandboxRef sandbox
       - HarnessSessionRef harnessSession
-      - SessionFacts facts
-      - SessionOrigin origin
+      - SessionId forkedFrom
+      int forkedAtTurn
+      - SessionState lifecycle
     }
     ValueObject SessionId { String value key }
-    ValueObject SandboxRef { String sandboxId }
-    /* The session's own worktree of a project repository: the session holds iso over it.
-       Merging back is done by the owner outside the system (branch push, PR) for the MVP. */
-    ValueObject Checkout {
-      String repositoryResourceId
-      String branch
-      String worktreePath
-      String storageHostId
-      String baseCommit
+
+    /* Found while writing the flow: "inactive" is not a session state. Nothing about the
+       session changes after 15 quiet minutes; only its sandbox stops. So the session stores
+       ACTIVE, RUNNING, ARCHIVED, and "needs you" and "inactive" are derived labels.
+       The 15-minute policy is a sandbox rule (Isolation), blocked while a request is pending. */
+    enum SessionState {
+      aggregateLifecycle
+      ACTIVE, RUNNING, ARCHIVED
     }
+
+    /* The session's own branch of a project repository; the session holds exclusive write. */
+    ValueObject Worktree {
+      String repository
+      String branch
+      String location
+    }
+
+    /* One prompt and everything the agents did until they stopped. */
+    Entity Turn {
+      int turnNumber
+      - Checkpoint checkpoint
+      String stopReason
+    }
+    /* The worktree as it was when the turn started (a commit on no branch). */
+    ValueObject Checkpoint { String commit }
+
+    /* Agents act for the session; they are never principals. */
+    Entity Agent {
+      - AgentId id
+      - AgentId parent
+      String profile
+      boolean lead
+      boolean reportedByHarness
+    }
+    ValueObject AgentId { String value key }
+
     /* The harness's own id for the conversation (omp JSONL, Claude Code JSONL, Codex rollout). */
     ValueObject HarnessSessionRef {
       String harness
       String externalId
     }
-    /* Status is derived from facts, never stored:
-       needs-you > running > active > inactive (15 min) > archived; archive outranked by later activity. */
-    ValueObject SessionFacts {
-      boolean running
-      int pendingRequests
-      long lastActivityAt
-      long archivedAt
-    }
-    enum SessionOrigin { CREATED, IMPORTED, FORKED }
 
-    /* One lead agent per session; subagents form a tree under it.
-       Agents are actors, not principals: they share the session's authority and are
-       recorded on every event and capability request for attribution. */
-    Entity Agent {
-      - AgentId id
-      - AgentId parent
-      - AgentRole role
-      - AgentProfileRef profile
-      - AgentObservation observedVia
+    /* An agent's question to the owner. Not authority: answering grants nothing. */
+    Entity Question {
+      String message
+      String form
+      String answer
     }
-    /* The lead is known; subagents are known only if the harness reports them. */
-    enum AgentObservation { STARTED_BY_CONTROL_PLANE, REPORTED_BY_HARNESS }
-    ValueObject AgentId { String value key }
-    enum AgentRole { LEAD, SUBAGENT }
-    ValueObject AgentProfileRef { String profileId }
 
-    /* A turn: one user message and everything the agent did until it stopped. */
-    Entity Turn {
-      - TurnId id
-      - SessionId session
-      long startedAt
-      long endedAt
-      - StopReason stopReason
-      - Checkpoint checkpoint
-    }
-    /* Code state when the turn started: a git commit of the worktree (tracked and untracked
-       files) that is not on any branch. Makes "fork from turn N" carry the code of turn N,
-       including changes made by shell commands and subagents. */
-    ValueObject Checkpoint {
-      String commit
-      long takenAt
-    }
-    ValueObject TurnId { String value key }
-    enum StopReason { END_TURN, CANCELLED, ERROR, MAX_TOKENS, REFUSAL }
-
-    DomainEvent SessionStarted {
-      - SessionId session
-      - ProjectId project
-      - AgentId leadAgent
-    }
-    DomainEvent SubagentSpawned {
-      - SessionId session
-      - AgentId agent
-      - AgentId parent
-    }
-    DomainEvent TurnStarted { - SessionId session - TurnId turn }
-    DomainEvent TurnEnded { - SessionId session - TurnId turn - StopReason stopReason }
+    DomainEvent SessionStarted { - SessionId session }
+    DomainEvent TurnStarted { - SessionId session int turn }
+    DomainEvent TurnEnded { - SessionId session int turn String stopReason }
     DomainEvent SessionArchived { - SessionId session }
-    /* A fork is a new session (new principal, new worktree branched from the checkpoint)
-       carrying the conversation up to fromTurn and a copy of the source's grants.
-       Exclusive (iso) grants are not copied: the fork gets iso over its own worktree instead. */
-    DomainEvent SessionForked { - SessionId session - SessionId forkedFrom - TurnId fromTurn }
+    DomainEvent SessionResumed { - SessionId session }
+    DomainEvent SessionForked { - SessionId session - SessionId forkedFrom int fromTurn }
+    DomainEvent SessionImported { - SessionId session - HarnessSessionRef source }
+  }
 
-    /* Status is derived, so crossing the 15-minute threshold emits nothing by itself;
-       an idle watcher observes it and raises this event, which stops the sandbox.
-       A session with a pending request is "needs-you", never inactive, so it never stops
-       while an agent waits; the request's own timeout resolves it. */
-    DomainEvent SessionWentInactive { - SessionId session }
-    DomainEvent SessionReactivated { - SessionId session }
-
-    Service SessionCommands {
-      @SessionId start(@ProjectId project, @AgentProfileRef lead);
-      @TurnId prompt(@SessionId session, String message);
-      void cancel(@SessionId session);
-      @SessionId fork(@SessionId session, @TurnId fromTurn);
-      @SessionId importFromHarness(@ProjectId project, @HarnessSessionRef ref);
-      void archive(@SessionId session);
-      void unarchive(@SessionId session);
+  Aggregate Project {
+    Entity Project {
+      aggregateRoot
+      String id
+      String name
+      /* What the project may touch; each entry is backed by a capability the project holds. */
+      List<String> resources
     }
   }
-}
-
-/* Reusable agent definitions, instantiated as a session's lead or as subagents. */
-BoundedContext AgentCatalog implements SessionLifecycle {
-  type = FEATURE
-  domainVisionStatement = "Named, versioned agent definitions: which harness, which model, which instructions and tools."
-  responsibilities = "Agent profiles", "Profile versions", "Default authority requests"
 
   Aggregate AgentProfile {
     Entity AgentProfile {
       aggregateRoot
-      - AgentProfileId id
-      - ProfileOwner ownedBy
-      String name
+      String id
       String harness
       String model
       String instructions
       List<String> tools
-      /* What a session started from this profile asks for up front, within the project's envelope. */
-      List<String> requestedCapabilities
       int version
-    }
-    ValueObject AgentProfileId { String value key }
-    /* Global profiles, or project-specific ones (a project can override a global profile). */
-    ValueObject ProfileOwner {
-      String projectId
     }
   }
 }
 
-/* ------------------------------------------------------------------ Authority */
-
-BoundedContext Authority implements AuthorityModel {
+BoundedContext Authority implements Authority {
   type = FEATURE
-  domainVisionStatement = "Object-capability authority: holders, rights lattices, modes, delegation, revocation."
-  responsibilities = "Capability registry", "Attenuation and delegation", "Iso ownership", "Revocation by epoch", "Capability requests (escalation)"
-  implementationTechnology = "Rust (capalg): lattice rights, typed move-only handles, proptest and Kani"
+  domainVisionStatement = "Capabilities (iso, val, tag) over resources, held by principals that follow containment: Owner > Project > Session."
 
-  Aggregate CapabilityRegistry {
-    Entity CapabilityRegistry {
-      aggregateRoot
-      - List<Capability> capabilities
-      int epoch
+  Application {
+    Command RequestCapability
+    Command DecideRequest
+    Command ExpireRequest
+    Command CancelRequest
+    Command Mint
+    Command Revoke
+    Command Consume
+
+    Flow CapabilityRequestLifecycle {
+      command RequestCapability [ initiated by "Agent" ] delegates to CapabilityRequest [ -> PENDING ] emits event CapabilityRequested
+      command DecideRequest [ initiated by "Owner" ] delegates to CapabilityRequest [ PENDING -> GRANTED_ONCE X GRANTED_FOR_SESSION X DENIED ] emits event RequestGranted X RequestDenied
+      command ExpireRequest delegates to CapabilityRequest [ PENDING -> EXPIRED ] emits event RequestDenied
+      command CancelRequest delegates to CapabilityRequest [ PENDING -> CANCELLED ] emits event RequestCancelled
+      event RequestGranted triggers command Mint
+      command Mint delegates to Capability [ -> LIVE ] emits event CapabilityGranted
+      command Revoke [ initiated by "Owner" ] delegates to Capability [ LIVE -> REVOKED ] emits event CapabilityRevoked
+      /* Found while writing the flow: "allow once" mints a single-use capability, which needs an end state. */
+      command Consume delegates to Capability [ LIVE -> CONSUMED ] emits event CapabilityConsumed
     }
+  }
+
+  Aggregate Capability {
     Entity Capability {
+      aggregateRoot
       - CapabilityId id
       - Principal holder
       - ResourceRef resource
       - Mode mode
-      - Rights rights
+      String rights
       - CapabilityId derivedFrom
-      int epoch
+      boolean singleUse
+      - CapabilityState lifecycle
     }
     ValueObject CapabilityId { String value key }
-    /* Principals follow containment: Owner > Project > Session, each holding a narrowing
-       of its parent's authority. Agents are not principals. ORGANISATION is reserved for
-       later multi-tenancy. */
-    ValueObject Principal {
-      - PrincipalKind kind
-      String id
-    }
-    enum PrincipalKind { OWNER, PROJECT, SESSION, ORGANISATION }
-    /* Pony-style reference capabilities: iso = exclusive write, val = shared immutable, tag = identity only. */
+    /* OWNER is root; ORGANISATION is reserved for later multi-tenancy. */
+    ValueObject Principal { String kind String id }
+    ValueObject ResourceRef { String kind String locator }
+    /* iso: exclusive, writable; val: shared, immutable; tag: identity only. */
     enum Mode { ISO, VAL, TAG }
-    ValueObject ResourceRef {
-      - ResourceKind kind
-      String locator
+    enum CapabilityState {
+      aggregateLifecycle
+      LIVE, CONSUMED, REVOKED
     }
-    enum ResourceKind { DIRECTORY, HTTP_ENDPOINT, SECRET, HOST, SANDBOX }
-    /* Rights form a lattice per resource kind (FsRights, HttpScope, SecretRights). */
-    ValueObject Rights {
-      String lattice
-      String value
-    }
-
     DomainEvent CapabilityGranted { - CapabilityId capability - Principal holder }
-    DomainEvent CapabilityAttenuated { - CapabilityId capability - CapabilityId derivedFrom }
-    DomainEvent CapabilitySent { - CapabilityId capability - Principal recipient }
-    DomainEvent CapabilityFrozen { - CapabilityId capability }
-    DomainEvent CapabilityRevoked { - CapabilityId capability int epoch }
-
-    Service CapabilityOperations {
-      @CapabilityId acquire(@Principal holder, @ResourceRef resource, @Mode mode, @Rights rights);
-      @CapabilityId attenuate(@CapabilityId capability, @Rights narrower);
-      void send(@CapabilityId capability, @Principal recipient);
-      void freeze(@CapabilityId capability);
-      void revoke(@CapabilityId capability);
-      boolean authorize(@Principal holder, @ResourceRef resource, @Rights needed);
-    }
+    DomainEvent CapabilityRevoked { - CapabilityId capability }
+    DomainEvent CapabilityConsumed { - CapabilityId capability }
   }
 
-  /* Suggestion: an approval is an agent asking for authority it does not hold.
-     A human who holds it answers by delegating (once, for the session) or refusing. */
   Aggregate CapabilityRequest {
     Entity CapabilityRequest {
       aggregateRoot
-      - CapabilityRequestId id
-      - Principal requester
+      String id
+      String sessionId
       String actingAgentId
       - ResourceRef resource
-      - Rights wanted
+      String rights
       String reason
-      - RequestDecision decision
+      - RequestState lifecycle
     }
-    /* The Owner decides (MVP: the only user, holding root authority, so every grant is a
-       delegation from something already held). */
-    ValueObject CapabilityRequestId { String value key }
-    enum RequestDecision { PENDING, GRANTED_ONCE, GRANTED_FOR_SESSION, DENIED, EXPIRED, CANCELLED }
-    DomainEvent CapabilityRequested { - CapabilityRequestId request - Principal requester }
-    DomainEvent CapabilityRequestDecided { - CapabilityRequestId request - RequestDecision decision }
+    enum RequestState {
+      aggregateLifecycle
+      PENDING, GRANTED_ONCE, GRANTED_FOR_SESSION, DENIED, EXPIRED, CANCELLED
+    }
+    DomainEvent CapabilityRequested { String request }
+    DomainEvent RequestGranted { String request }
+    DomainEvent RequestDenied { String request }
+    DomainEvent RequestCancelled { String request }
   }
 }
 
-/* ------------------------------------------------------------------ Isolation */
+BoundedContext Secrets implements Secrets {
+  type = FEATURE
+  domainVisionStatement = "The owner's secrets; a session sees a placeholder, and the real value is substituted only on the way out of the sandbox."
+
+  Aggregate Secret {
+    Entity Secret {
+      aggregateRoot
+      String name
+      /* A reference into the owner's secret store (secretspec), never the value. */
+      String source
+      /* Where the real value may be sent, e.g. api.github.com. */
+      List<String> allowedDestinations
+    }
+    /* What the agent sees and uses; valid only while the session holds the secret capability. */
+    ValueObject Placeholder {
+      String token
+      String secret
+      String sessionId
+    }
+  }
+}
 
 BoundedContext Isolation implements Isolation {
   type = FEATURE
-  domainVisionStatement = "The hypervisor proper: one microVM per session, enforcing authority as mounts and egress rules."
-  responsibilities = "Sandbox lifecycle", "Mounts (virtio-fs)", "Egress policy", "Snapshots"
-  implementationTechnology = "Cloud Hypervisor, virtio-fs, vm.add-fs hotplug, snapshot/restore"
+  domainVisionStatement = "One sandbox per session on a compute host; mounts and egress rules are the physical form of capabilities."
+
+  Application {
+    Command Provision
+    /* Policy: 15 minutes without activity from the owner or any agent, and no pending request. */
+    Command StopIdle
+    Command Stop
+    Command Start
+    Command Destroy
+
+    Flow SandboxLifecycle {
+      command Provision delegates to Sandbox [ -> RUNNING ] emits event SandboxRunning
+      command Stop delegates to Sandbox [ RUNNING -> STOPPED ] emits event SandboxStopped
+      command StopIdle delegates to Sandbox [ RUNNING -> STOPPED ] emits event SandboxStopped
+      command Start delegates to Sandbox [ STOPPED -> RUNNING ] emits event SandboxRunning
+      command Destroy delegates to Sandbox [ RUNNING, STOPPED -> DESTROYED ] emits event SandboxDestroyed
+    }
+  }
 
   Aggregate Sandbox {
     Entity Sandbox {
       aggregateRoot
-      - SandboxId id
-      - HostRef host
-      - List<Mount> mounts
-      - EgressPolicy egress
+      String id
+      String sessionId
+      String host
+      List<String> mounts
+      List<String> allowedEgress
       - SandboxState lifecycle
     }
-    ValueObject SandboxId { String value key }
-    ValueObject HostRef { String hostId }
-    /* A mount is the physical form of a directory capability. */
-    ValueObject Mount {
-      String hostPath
-      String guestPath
-      boolean writable
-      String capabilityId
-    }
-    ValueObject EgressPolicy {
-      String proxyAddress
-      String allowedHosts
-    }
-    /* STOPPED: the VM is shut down; everything durable (worktree, harness transcript, record)
-       lives on the host, so resuming boots a fresh VM and the harness reloads its session.
-       Lost on stop: running processes inside the VM (dev servers, watchers). */
+    /* STOPPED keeps nothing in memory: durable state (worktree, transcripts) lives on the host. */
     enum SandboxState {
       aggregateLifecycle
-      PROVISIONING, RUNNING, STOPPED, DESTROYED
+      RUNNING, STOPPED, DESTROYED
     }
-    DomainEvent SandboxProvisioned { - SandboxId sandbox - HostRef host }
-    DomainEvent SandboxStopped { - SandboxId sandbox }
-    /* Mounts follow capabilities at any time: grant hot-plugs a virtio-fs device (add-fs),
-       revoke unplugs it (remove-device). Changes to a STOPPED sandbox apply at next boot. */
-    DomainEvent MountAttached { - SandboxId sandbox - Mount mount }
-    DomainEvent MountDetached { - SandboxId sandbox - Mount mount }
-
-    Service SandboxLifecycle {
-      @SandboxId provision(@HostRef host) : write [ -> PROVISIONING ];
-      void ready(@SandboxId sandbox) : write [ PROVISIONING -> RUNNING ];
-      void stop(@SandboxId sandbox) : write [ RUNNING -> STOPPED ];
-      void start(@SandboxId sandbox) : write [ STOPPED -> PROVISIONING ];
-      void destroy(@SandboxId sandbox) : write [ PROVISIONING, RUNNING, STOPPED -> DESTROYED ];
-      void attachMount(@SandboxId sandbox, @Mount mount);
-      void detachMount(@SandboxId sandbox, @Mount mount);
-    }
+    DomainEvent SandboxRunning { String sandbox }
+    DomainEvent SandboxStopped { String sandbox }
+    DomainEvent SandboxDestroyed { String sandbox }
   }
-}
 
-/* ------------------------------------------------------------ HarnessGateway */
-
-BoundedContext HarnessGateway implements HarnessAdaptation {
-  type = FEATURE
-  domainVisionStatement = "Speak each harness's protocol; expose one connection model to orchestration."
-  responsibilities = "Harness adapters", "ACP translation", "Elicitation shim", "Session listing and replay"
-
-  Aggregate HarnessConnection {
-    Entity HarnessConnection {
+  Aggregate Host {
+    Entity Host {
       aggregateRoot
-      - HarnessConnectionId id
-      - HarnessKind harness
-      String sessionId
-      String sandboxId
-      List<String> advertisedCapabilities
-    }
-    ValueObject HarnessConnectionId { String value key }
-    enum HarnessKind { OMP, CLAUDE_CODE, CODEX, PI, CUSTOM }
-  }
-}
-
-/* ------------------------------------------------------------------ Attention */
-
-BoundedContext Attention implements HumanOversight {
-  type = FEATURE
-  domainVisionStatement = "One inbox for everything that needs a person, answerable from any device."
-  responsibilities = "Pending items", "Agent questions (elicitation)", "Notifications", "Timeouts"
-
-  Aggregate AttentionItem {
-    Entity AttentionItem {
-      aggregateRoot
-      - AttentionItemId id
-      String sessionId
-      - AttentionKind kind
-      - AttentionState lifecycle
-      long createdAt
-    }
-    ValueObject AttentionItemId { String value key }
-    /* APPROVAL points at an Authority CapabilityRequest; QUESTION carries an elicitation form. */
-    enum AttentionKind { APPROVAL, QUESTION }
-    enum AttentionState {
-      aggregateLifecycle
-      PENDING, ANSWERED, DECLINED, EXPIRED, CANCELLED
-    }
-    Entity Question {
-      String message
-      String formSchema
-      String answer
+      String name
+      String tailnetAddress
+      boolean compute
+      boolean storage
     }
   }
-}
-
-/* -------------------------------------------------------- CredentialBrokerage */
-
-BoundedContext CredentialBrokerage implements SecretHandling {
-  type = FEATURE
-  domainVisionStatement = "Resolve placeholders into real credentials at the egress boundary, only for holders of a secret capability."
-  responsibilities = "Secret references (secretspec)", "Placeholders", "Egress injection", "Provider accounts"
-
-  Aggregate SecretBinding {
-    Entity SecretBinding {
-      aggregateRoot
-      - SecretBindingId id
-      String secretRef
-      String placeholder
-      String allowedHosts
-      String capabilityId
-    }
-    ValueObject SecretBindingId { String value key }
-
-  }
-}
-
-/* -------------------------------------------------------------- SessionRecord */
-
-BoundedContext SessionRecord implements Audit {
-  type = FEATURE
-  domainVisionStatement = "Append-only record of every event, decision and grant; the source for transcripts and audits."
-  responsibilities = "Event log", "Replies-only transcript", "Audit trail"
-}
-
-/* ---------------------------------------------------------- External systems */
-
-BoundedContext Harnesses {
-  type = SYSTEM
-  domainVisionStatement = "omp, Claude Code, Codex, pi: agent loops we run but do not own."
-}
-
-BoundedContext ModelProviders {
-  type = SYSTEM
-  domainVisionStatement = "Anthropic, OpenAI, local models: reached only through the egress proxy."
 }

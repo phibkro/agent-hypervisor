@@ -1,0 +1,20 @@
+@startuml
+
+skinparam componentStyle uml2
+
+ACTIVE : 
+RUNNING : 
+ARCHIVED : 
+[*] --> ACTIVE : StartSession
+ACTIVE --> RUNNING : SendPrompt
+ARCHIVED --> RUNNING : SendPrompt
+RUNNING --> ACTIVE : EndTurn
+ACTIVE --> ARCHIVED : ArchiveSession
+ARCHIVED --> ACTIVE : ResumeSession
+
+
+legend top center
+  SessionLifecycle State Transitions
+endlegend
+
+@enduml

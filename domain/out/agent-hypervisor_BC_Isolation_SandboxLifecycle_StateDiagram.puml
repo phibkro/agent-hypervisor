@@ -1,0 +1,20 @@
+@startuml
+
+skinparam componentStyle uml2
+
+RUNNING : 
+STOPPED : 
+DESTROYED : 
+[*] --> RUNNING : Provision
+RUNNING --> STOPPED : Stop
+RUNNING --> STOPPED : StopIdle
+STOPPED --> RUNNING : Start
+RUNNING --> DESTROYED : Destroy
+STOPPED --> DESTROYED : Destroy
+
+
+legend top center
+  SandboxLifecycle State Transitions
+endlegend
+
+@enduml
