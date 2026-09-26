@@ -1,0 +1,11 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 973e40530da4b99beb5b31bab2e2772099f72576f13282773e7fc000adfb01f5 # shrinks to ops = [Acquire { s: 0, r: 2, mode: Iso, rights: Secret(SecretRights { scope: HttpScope { host: "", methods: {}, prefixes: {} }, rotate: false, reveal: false }) }, Send { pick: 0, to: 1, rights: Fs(FsRights { read: false, write: false }) }], probes = [Read, Read, Read, Read]
+cc f10aa09b166dbfe6a9b63605e177d97fc61f9ee4225577117eed32222d95c6e9 # shrinks to ops = [Acquire { s: 0, r: 0, mode: Iso, rights: Fs(FsRights { read: false, write: false }) }, Acquire { s: 0, r: 0, mode: Iso, rights: Fs(FsRights { read: false, write: false }) }, Acquire { s: 0, r: 0, mode: Iso, rights: Fs(FsRights { read: false, write: false }) }, Freeze { pick: 0 }], probes = [Read, Read, Read, Read]
+cc 4566742794a3caa2a6f4034e117082a5e96b7f3153911f16574675cf8974bc87 # shrinks to ops = [Acquire { s: 2, r: 2, mode: Iso, rights: Secret(SecretRights { scope: HttpScope { host: "", methods: {}, prefixes: {} }, rotate: false, reveal: true }) }, Acquire { s: 0, r: 2, mode: Iso, rights: Secret(SecretRights { scope: HttpScope { host: "", methods: {}, prefixes: {} }, rotate: false, reveal: false }) }], probes = [Read, Read, Read, Read]
+cc 86148d19ab2c76df0eca50adbf0f862d07fff1e8747d38359809b55984452597 # shrinks to a = Secret(SecretRights { scope: HttpScope { host: "api.stripe.com", methods: {Get}, prefixes: {"/"} }, rotate: false, reveal: false }), b = Secret(SecretRights { scope: HttpScope { host: "api.stripe.com", methods: {Post}, prefixes: {"/"} }, rotate: false, reveal: false }), c = Fs(FsRights { read: false, write: false })
+cc e7ce89e71187eeff6db91f61beea4dccbd46a6850c45a5d8fbe6404beec1cf9b # shrinks to ops = [Acquire { s: 0, r: 1, mode: Iso, rights: Fs(FsRights { read: false, write: false }) }, Acquire { s: 0, r: 0, mode: Iso, rights: Fs(FsRights { read: false, write: false }) }, Send { pick: 2118577086716847590, to: 1, rights: Fs(FsRights { read: false, write: false }) }, Acquire { s: 0, r: 1, mode: Iso, rights: Fs(FsRights { read: true, write: false }) }], probes = [Read, Read, Read, Read]
