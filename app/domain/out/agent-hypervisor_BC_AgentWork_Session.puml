@@ -1,0 +1,107 @@
+@startuml
+
+skinparam componentStyle uml2
+
+package "'Session' Aggregate" <<Rectangle>> {
+	class Session <<(A,#fffab8) Aggregate Root>> {
+		String projectId
+		String title
+		int forkedAtTurn
+		SessionId id
+		Worktree worktree
+		List<Turn> turns
+		List<Agent> agents
+		HarnessSessionRef harnessSession
+		SessionId forkedFrom
+		SessionState lifecycle
+	}
+	class SessionId <<(V,DarkSeaGreen) Value Object>> {
+		String value
+	}
+	enum SessionState {
+		ACTIVE
+		RUNNING
+		ARCHIVED
+	}
+	class Worktree <<(V,DarkSeaGreen) Value Object>> {
+		String repository
+		String branch
+		String location
+	}
+	class Turn <<(E,DarkSeaGreen) Entity>> {
+		int turnNumber
+		String stopReason
+		Checkpoint checkpoint
+	}
+	class Checkpoint <<(V,DarkSeaGreen) Value Object>> {
+		String commit
+	}
+	class Agent <<(E,DarkSeaGreen) Entity>> {
+		String profile
+		boolean lead
+		boolean reportedByHarness
+		AgentId id
+		AgentId parent
+	}
+	class AgentId <<(V,DarkSeaGreen) Value Object>> {
+		String value
+	}
+	class HarnessSessionRef <<(V,DarkSeaGreen) Value Object>> {
+		String harness
+		String externalId
+	}
+	class Question <<(E,DarkSeaGreen) Entity>> {
+		String message
+		String form
+		String answer
+	}
+	class SessionStarted <<(E,#ff9f4b) Domain Event>> {
+		SessionId session
+	}
+	class TurnStarted <<(E,#ff9f4b) Domain Event>> {
+		int turn
+		SessionId session
+	}
+	class TurnEnded <<(E,#ff9f4b) Domain Event>> {
+		int turn
+		String stopReason
+		SessionId session
+	}
+	class SessionArchived <<(E,#ff9f4b) Domain Event>> {
+		SessionId session
+	}
+	class SessionResumed <<(E,#ff9f4b) Domain Event>> {
+		SessionId session
+	}
+	class SessionForked <<(E,#ff9f4b) Domain Event>> {
+		int fromTurn
+		SessionId session
+		SessionId forkedFrom
+	}
+	class SessionImported <<(E,#ff9f4b) Domain Event>> {
+		SessionId session
+		HarnessSessionRef source
+	}
+}
+SessionArchived --> SessionId : session
+SessionImported --> HarnessSessionRef : source
+Session --> HarnessSessionRef : harnessSession
+SessionImported --> SessionId : session
+TurnStarted --> SessionId : session
+SessionStarted --> SessionId : session
+SessionForked --> SessionId : forkedFrom
+Agent --> AgentId : parent
+Agent --> AgentId : id
+Session --> SessionState : lifecycle
+SessionForked --> SessionId : session
+Session --> SessionId : forkedFrom
+Session "1" *--> "*" Turn : turns
+Session --> SessionId : id
+Turn --> Checkpoint : checkpoint
+Session --> Worktree : worktree
+TurnEnded --> SessionId : session
+SessionResumed --> SessionId : session
+Session "1" *--> "*" Agent : agents
+
+
+@enduml

@@ -1,0 +1,15 @@
+@startuml
+
+skinparam componentStyle uml2
+
+package "'Host' Aggregate" <<Rectangle>> {
+	class Host <<(A,#fffab8) Aggregate Root>> {
+		String name
+		String tailnetAddress
+		boolean compute
+		boolean storage
+	}
+}
+
+
+@enduml

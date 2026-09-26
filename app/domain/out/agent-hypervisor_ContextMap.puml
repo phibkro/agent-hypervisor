@@ -1,0 +1,50 @@
+@startuml
+
+skinparam componentStyle uml2
+
+component [AgentWork]
+note right of [AgentWork]
+Sessions, their turns and agents, 
+and the code they work on. 
+end note
+component [Authority]
+note right of [Authority]
+Capabilities (iso, val, tag) over 
+resources, held by principals 
+that follow containment: Owner 
+> Project > Session. 
+end note
+component [Secrets]
+note right of [Secrets]
+The owner's secrets; a session 
+sees a placeholder, and the real 
+value is substituted only on the 
+way out of the sandbox. 
+end note
+component [Isolation]
+note right of [Isolation]
+One sandbox per session on a compute 
+host; mounts and egress rules 
+are the physical form of capabilities. 
+
+end note
+
+interface "Upstream-Downstream" as AgentWork_to_Authority
+[Authority] --> AgentWork_to_Authority : OPEN_HOST_SERVICE, PUBLISHED_LANGUAGE
+AgentWork_to_Authority <.. [AgentWork] : consume
+
+interface "Upstream-Downstream" as Secrets_to_Authority
+[Authority] --> Secrets_to_Authority : OPEN_HOST_SERVICE, PUBLISHED_LANGUAGE
+Secrets_to_Authority <.. [Secrets] : consume
+
+interface "Upstream-Downstream" as Isolation_to_Authority
+[Authority] --> Isolation_to_Authority : OPEN_HOST_SERVICE, PUBLISHED_LANGUAGE
+Isolation_to_Authority <.. [Isolation] : consume
+
+interface "Customer-Supplier" as AgentWork_to_Isolation
+[Isolation] --> AgentWork_to_Isolation : Supplier
+AgentWork_to_Isolation <.. [AgentWork] : Customer 
+
+
+
+@enduml

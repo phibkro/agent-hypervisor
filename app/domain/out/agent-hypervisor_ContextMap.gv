@@ -1,0 +1,27 @@
+digraph "ContextMapGraph" {
+graph ["imagepath"="/tmp/GraphvizJava"]
+"AgentWork" ["margin"="0.3","orientation"="204","shape"="egg","fontsize"="16","style"="bold","label"="AgentWork\n","fontname"="sans-serif"]
+"Authority" ["margin"="0.3","orientation"="334","shape"="egg","fontsize"="16","style"="bold","label"="Authority\n","fontname"="sans-serif"]
+"Isolation" ["margin"="0.3","orientation"="194","shape"="egg","fontsize"="16","style"="bold","label"="Isolation\n","fontname"="sans-serif"]
+"Secrets" ["margin"="0.3","orientation"="207","shape"="egg","fontsize"="16","style"="bold","label"="Secrets\n","fontname"="sans-serif"]
+"Authority" -> "Isolation" ["headlabel"=<<table cellspacing="0" cellborder="0" border="0">
+<tr><td bgcolor="white">D</td></tr>
+</table>>,"labeldistance"="0","fontsize"="12","taillabel"=<<table cellspacing="0" cellborder="1" border="0">
+<tr><td bgcolor="white" sides="r">U</td><td sides="trbl" bgcolor="white"><font>OHS, PL</font></td></tr>
+</table>>,"style"="bold","label"="                                        ","dir"="none","fontname"="sans-serif"]
+"Authority" -> "Secrets" ["headlabel"=<<table cellspacing="0" cellborder="0" border="0">
+<tr><td bgcolor="white">D</td></tr>
+</table>>,"labeldistance"="0","fontsize"="12","taillabel"=<<table cellspacing="0" cellborder="1" border="0">
+<tr><td bgcolor="white" sides="r">U</td><td sides="trbl" bgcolor="white"><font>OHS, PL</font></td></tr>
+</table>>,"style"="bold","label"="                                        ","dir"="none","fontname"="sans-serif"]
+"Authority" -> "AgentWork" ["headlabel"=<<table cellspacing="0" cellborder="0" border="0">
+<tr><td bgcolor="white">D</td></tr>
+</table>>,"labeldistance"="0","fontsize"="12","taillabel"=<<table cellspacing="0" cellborder="1" border="0">
+<tr><td bgcolor="white" sides="r">U</td><td sides="trbl" bgcolor="white"><font>OHS, PL</font></td></tr>
+</table>>,"style"="bold","label"="                                        ","dir"="none","fontname"="sans-serif"]
+"Isolation" -> "AgentWork" ["headlabel"=<<table cellspacing="0" cellborder="0" border="0">
+<tr><td bgcolor="white">D</td></tr>
+</table>>,"labeldistance"="0","fontsize"="12","taillabel"=<<table cellspacing="0" cellborder="0" border="0">
+<tr><td bgcolor="white">U</td></tr>
+</table>>,"style"="bold","label"="Customer/Supplier","dir"="none","fontname"="sans-serif"]
+}

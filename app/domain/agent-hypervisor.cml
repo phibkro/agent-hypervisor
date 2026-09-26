@@ -1,0 +1,425 @@
+/*
+ * Agent Hypervisor: domain model, draft 4 (discovery pass).
+ *
+ * Built bottom-up from what the owner and agents do (user stories), then the nouns
+ * those stories use (subdomain entities), then the lifecycles where rules live (flows).
+ * Bounded contexts only where the language differs.
+ *
+ * MVP scope: one owner, many projects, one host (multi-host by design).
+ */
+
+/* ======================================================= who does what, and why */
+
+UserStory StartSession {
+  As an "Owner"
+    I want to "start" a "Session" in a "Project"
+    I want to "choose" an "AgentProfile" for a "Session"
+  so that "an agent works on a task in its own sandbox and worktree"
+}
+
+UserStory WorkInParallel {
+  As an "Owner"
+    I want to "run" a "Session" in a "Repository"
+      so that "independent tasks progress at once without overwriting each other"
+}
+
+UserStory RequestCapability {
+  As an "Agent"
+    I want to "request" a "Capability" for a "Session"
+  so that "I can continue a task that needs authority the session does not hold"
+  and that "owner control" is promoted
+  accepting that "agent autonomy" is harmed
+}
+
+UserStory DecideRequest {
+  As an "Owner"
+    I want to "grant" a "CapabilityRequest" with its "scope"
+    I want to "deny" a "CapabilityRequest"
+  so that "agents get exactly the authority a task needs, decided from any device"
+  and that "owner control" is promoted
+  accepting that "agent throughput" is reduced
+}
+
+UserStory GrantAndRevoke {
+  As an "Owner"
+    I want to "grant" a "Capability" to a "Session"
+    I want to "revoke" a "Capability"
+  so that "authority can change at any time, even while an agent is working"
+}
+
+UserStory UseSecretWithoutSeeingIt {
+  As an "Owner"
+    I want to "grant" a "Secret" to a "Session"
+    I want to "use" a "Placeholder" in a "Request"
+  so that "the agent can call a service without the secret entering its sandbox"
+  and that "confidentiality" is promoted
+  accepting that "transparency" is harmed
+}
+
+UserStory AnswerQuestion {
+  As an "Agent"
+    I want to "ask" a "Question" with its "options"
+  so that "I resolve ambiguity with the owner instead of guessing"
+}
+
+UserStory ForkSession {
+  As an "Owner"
+    I want to "fork" a "Session" with its "conversation", "code", "grants"
+    I want to "choose" a "Turn" in a "Session"
+  so that "I can try another approach from that point"
+}
+
+UserStory ImportSession {
+  As an "Owner"
+    I want to "import" a "HarnessSession" to a "Project"
+  so that "work begun in a terminal continues here"
+}
+
+UserStory PauseAndResume {
+  As an "Owner"
+    I want to "archive" a "Session"
+    I want to "resume" a "Session"
+  so that "idle sessions cost nothing and nothing is lost"
+}
+
+UserStory ReadReplies {
+  As an "Owner"
+    I want to "read" the "Replies" in a "Session"
+  so that "I can catch up on a session from my phone"
+}
+
+UserStory DelegateToSubagent {
+  As an "Agent"
+    I want to "spawn" a "Subagent" in a "Session"
+  so that "I can split a task without asking for new authority"
+}
+
+/* ======================================================= the problem space */
+
+Domain AgentHypervisor {
+  domainVisionStatement = "Run any coding agent with exactly the authority its task needs, and supervise it from anywhere."
+
+  Subdomain AgentWork supports StartSession, WorkInParallel, ForkSession, ImportSession, PauseAndResume, ReadReplies, AnswerQuestion, DelegateToSubagent {
+    type = CORE_DOMAIN
+    domainVisionStatement = "Units of agent work: who does them, on what code, and how they branch and pause."
+    Entity Project { String name }
+    Entity Session { String title }
+    Entity Turn { int turnNumber }
+    Entity Agent { String role }
+    Entity AgentProfile { String harness String model }
+    Entity Worktree { String branch }
+    Entity Checkpoint { String commit }
+    Entity Question { String message }
+    Entity HarnessSession { String externalId }
+  }
+
+  Subdomain Authority supports RequestCapability, DecideRequest, GrantAndRevoke {
+    type = CORE_DOMAIN
+    domainVisionStatement = "Object capabilities: who holds what authority over which resource, how it is narrowed, delegated and revoked."
+    Entity Capability { String mode }
+    Entity CapabilityRequest { String reason }
+    Entity ProtectedResource { String locator }
+    Entity Principal { String kind }
+  }
+
+  Subdomain Secrets supports UseSecretWithoutSeeingIt {
+    type = CORE_DOMAIN
+    domainVisionStatement = "Secrets used by agents through placeholders, resolved only at the sandbox boundary."
+    Entity Secret { String name }
+    Entity Placeholder { String token }
+  }
+
+  Subdomain Isolation {
+    type = SUPPORTING_DOMAIN
+    domainVisionStatement = "Where agent work physically runs: a sandbox per session on a host, enforcing granted authority."
+    Entity Sandbox { String lifecycleState }
+    Entity Host { String name }
+  }
+}
+
+/* ======================================================= the solution space */
+
+ContextMap AgentHypervisorMap {
+  type = SYSTEM_LANDSCAPE
+  state = TO_BE
+  contains AgentWork, Authority, Secrets, Isolation
+
+  /* Authority is the shared language of permission; the others conform to its terms. */
+  Authority [U,OHS,PL] -> [D] AgentWork
+  Authority [U,OHS,PL] -> [D] Secrets
+  Authority [U,OHS,PL] -> [D] Isolation
+
+  /* Work tells isolation what should run; isolation serves it. */
+  Isolation [S] -> [C] AgentWork
+}
+
+BoundedContext AgentWork implements AgentWork {
+  type = FEATURE
+  domainVisionStatement = "Sessions, their turns and agents, and the code they work on."
+
+  Application {
+    Command StartSession
+    Command SendPrompt
+    Command EndTurn
+    Command ForkSession
+    Command ArchiveSession
+    Command ResumeSession
+    Command ImportSession
+
+    Flow SessionLifecycle {
+      command StartSession [ initiated by "Owner" ] delegates to Session [ -> ACTIVE ] emits event SessionStarted
+      command SendPrompt [ initiated by "Owner" ] delegates to Session [ ACTIVE, ARCHIVED -> RUNNING ] emits event TurnStarted
+      command EndTurn delegates to Session [ RUNNING -> ACTIVE ] emits event TurnEnded
+      command ArchiveSession [ initiated by "Owner" ] delegates to Session [ ACTIVE -> ARCHIVED ] emits event SessionArchived
+      command ResumeSession [ initiated by "Owner" ] delegates to Session [ ARCHIVED -> ACTIVE ] emits event SessionResumed
+      command ForkSession [ initiated by "Owner" ] emits event SessionForked
+      event SessionForked triggers command StartSession
+      command ImportSession [ initiated by "Owner" ] emits event SessionImported
+      event SessionImported triggers command StartSession
+    }
+  }
+
+  Aggregate Session {
+    Entity Session {
+      aggregateRoot
+      - SessionId id
+      String projectId
+      String title
+      - Worktree worktree
+      - List<Turn> turns
+      - List<Agent> agents
+      - HarnessSessionRef harnessSession
+      - SessionId forkedFrom
+      int forkedAtTurn
+      - SessionState lifecycle
+    }
+    ValueObject SessionId { String value key }
+
+    /* Found while writing the flow: "inactive" is not a session state. Nothing about the
+       session changes after 15 quiet minutes; only its sandbox stops. So the session stores
+       ACTIVE, RUNNING, ARCHIVED, and "needs you" and "inactive" are derived labels.
+       The 15-minute policy is a sandbox rule (Isolation), blocked while a request is pending. */
+    enum SessionState {
+      aggregateLifecycle
+      ACTIVE, RUNNING, ARCHIVED
+    }
+
+    /* The session's own branch of a project repository; the session holds exclusive write. */
+    ValueObject Worktree {
+      String repository
+      String branch
+      String location
+    }
+
+    /* One prompt and everything the agents did until they stopped. */
+    Entity Turn {
+      int turnNumber
+      - Checkpoint checkpoint
+      String stopReason
+    }
+    /* The worktree as it was when the turn started (a commit on no branch). */
+    ValueObject Checkpoint { String commit }
+
+    /* Agents act for the session; they are never principals. */
+    Entity Agent {
+      - AgentId id
+      - AgentId parent
+      String profile
+      boolean lead
+      boolean reportedByHarness
+    }
+    ValueObject AgentId { String value key }
+
+    /* The harness's own id for the conversation (omp JSONL, Claude Code JSONL, Codex rollout). */
+    ValueObject HarnessSessionRef {
+      String harness
+      String externalId
+    }
+
+    /* An agent's question to the owner. Not authority: answering grants nothing. */
+    Entity Question {
+      String message
+      String form
+      String answer
+    }
+
+    DomainEvent SessionStarted { - SessionId session }
+    DomainEvent TurnStarted { - SessionId session int turn }
+    DomainEvent TurnEnded { - SessionId session int turn String stopReason }
+    DomainEvent SessionArchived { - SessionId session }
+    DomainEvent SessionResumed { - SessionId session }
+    DomainEvent SessionForked { - SessionId session - SessionId forkedFrom int fromTurn }
+    DomainEvent SessionImported { - SessionId session - HarnessSessionRef source }
+  }
+
+  Aggregate Project {
+    Entity Project {
+      aggregateRoot
+      String id
+      String name
+      /* What the project may touch; each entry is backed by a capability the project holds. */
+      List<String> resources
+    }
+  }
+
+  Aggregate AgentProfile {
+    Entity AgentProfile {
+      aggregateRoot
+      String id
+      String harness
+      String model
+      String instructions
+      List<String> tools
+      int version
+    }
+  }
+}
+
+BoundedContext Authority implements Authority {
+  type = FEATURE
+  domainVisionStatement = "Capabilities (iso, val, tag) over resources, held by principals that follow containment: Owner > Project > Session."
+
+  Application {
+    Command RequestCapability
+    Command DecideRequest
+    Command ExpireRequest
+    Command CancelRequest
+    Command Mint
+    Command Revoke
+    Command Consume
+
+    Flow CapabilityRequestLifecycle {
+      command RequestCapability [ initiated by "Agent" ] delegates to CapabilityRequest [ -> PENDING ] emits event CapabilityRequested
+      command DecideRequest [ initiated by "Owner" ] delegates to CapabilityRequest [ PENDING -> GRANTED_ONCE X GRANTED_FOR_SESSION X DENIED ] emits event RequestGranted X RequestDenied
+      command ExpireRequest delegates to CapabilityRequest [ PENDING -> EXPIRED ] emits event RequestDenied
+      command CancelRequest delegates to CapabilityRequest [ PENDING -> CANCELLED ] emits event RequestCancelled
+      event RequestGranted triggers command Mint
+      command Mint delegates to Capability [ -> LIVE ] emits event CapabilityGranted
+      command Revoke [ initiated by "Owner" ] delegates to Capability [ LIVE -> REVOKED ] emits event CapabilityRevoked
+      /* Found while writing the flow: "allow once" mints a single-use capability, which needs an end state. */
+      command Consume delegates to Capability [ LIVE -> CONSUMED ] emits event CapabilityConsumed
+    }
+  }
+
+  Aggregate Capability {
+    Entity Capability {
+      aggregateRoot
+      - CapabilityId id
+      - Principal holder
+      - ResourceRef resource
+      - Mode mode
+      String rights
+      - CapabilityId derivedFrom
+      boolean singleUse
+      - CapabilityState lifecycle
+    }
+    ValueObject CapabilityId { String value key }
+    /* OWNER is root; ORGANISATION is reserved for later multi-tenancy. */
+    ValueObject Principal { String kind String id }
+    ValueObject ResourceRef { String kind String locator }
+    /* iso: exclusive, writable; val: shared, immutable; tag: identity only. */
+    enum Mode { ISO, VAL, TAG }
+    enum CapabilityState {
+      aggregateLifecycle
+      LIVE, CONSUMED, REVOKED
+    }
+    DomainEvent CapabilityGranted { - CapabilityId capability - Principal holder }
+    DomainEvent CapabilityRevoked { - CapabilityId capability }
+    DomainEvent CapabilityConsumed { - CapabilityId capability }
+  }
+
+  Aggregate CapabilityRequest {
+    Entity CapabilityRequest {
+      aggregateRoot
+      String id
+      String sessionId
+      String actingAgentId
+      - ResourceRef resource
+      String rights
+      String reason
+      - RequestState lifecycle
+    }
+    enum RequestState {
+      aggregateLifecycle
+      PENDING, GRANTED_ONCE, GRANTED_FOR_SESSION, DENIED, EXPIRED, CANCELLED
+    }
+    DomainEvent CapabilityRequested { String request }
+    DomainEvent RequestGranted { String request }
+    DomainEvent RequestDenied { String request }
+    DomainEvent RequestCancelled { String request }
+  }
+}
+
+BoundedContext Secrets implements Secrets {
+  type = FEATURE
+  domainVisionStatement = "The owner's secrets; a session sees a placeholder, and the real value is substituted only on the way out of the sandbox."
+
+  Aggregate Secret {
+    Entity Secret {
+      aggregateRoot
+      String name
+      /* A reference into the owner's secret store (secretspec), never the value. */
+      String source
+      /* Where the real value may be sent, e.g. api.github.com. */
+      List<String> allowedDestinations
+    }
+    /* What the agent sees and uses; valid only while the session holds the secret capability. */
+    ValueObject Placeholder {
+      String token
+      String secret
+      String sessionId
+    }
+  }
+}
+
+BoundedContext Isolation implements Isolation {
+  type = FEATURE
+  domainVisionStatement = "One sandbox per session on a compute host; mounts and egress rules are the physical form of capabilities."
+
+  Application {
+    Command Provision
+    /* Policy: 15 minutes without activity from the owner or any agent, and no pending request. */
+    Command StopIdle
+    Command Stop
+    Command Start
+    Command Destroy
+
+    Flow SandboxLifecycle {
+      command Provision delegates to Sandbox [ -> RUNNING ] emits event SandboxRunning
+      command Stop delegates to Sandbox [ RUNNING -> STOPPED ] emits event SandboxStopped
+      command StopIdle delegates to Sandbox [ RUNNING -> STOPPED ] emits event SandboxStopped
+      command Start delegates to Sandbox [ STOPPED -> RUNNING ] emits event SandboxRunning
+      command Destroy delegates to Sandbox [ RUNNING, STOPPED -> DESTROYED ] emits event SandboxDestroyed
+    }
+  }
+
+  Aggregate Sandbox {
+    Entity Sandbox {
+      aggregateRoot
+      String id
+      String sessionId
+      String host
+      List<String> mounts
+      List<String> allowedEgress
+      - SandboxState lifecycle
+    }
+    /* STOPPED keeps nothing in memory: durable state (worktree, transcripts) lives on the host. */
+    enum SandboxState {
+      aggregateLifecycle
+      RUNNING, STOPPED, DESTROYED
+    }
+    DomainEvent SandboxRunning { String sandbox }
+    DomainEvent SandboxStopped { String sandbox }
+    DomainEvent SandboxDestroyed { String sandbox }
+  }
+
+  Aggregate Host {
+    Entity Host {
+      aggregateRoot
+      String name
+      String tailnetAddress
+      boolean compute
+      boolean storage
+    }
+  }
+}

@@ -1,0 +1,32 @@
+@startuml
+
+skinparam componentStyle uml2
+
+package "'Sandbox' Aggregate" <<Rectangle>> {
+	class Sandbox <<(A,#fffab8) Aggregate Root>> {
+		String id
+		String sessionId
+		String host
+		List<String> mounts
+		List<String> allowedEgress
+		SandboxState lifecycle
+	}
+	enum SandboxState {
+		RUNNING
+		STOPPED
+		DESTROYED
+	}
+	class SandboxRunning <<(E,#ff9f4b) Domain Event>> {
+		String sandbox
+	}
+	class SandboxStopped <<(E,#ff9f4b) Domain Event>> {
+		String sandbox
+	}
+	class SandboxDestroyed <<(E,#ff9f4b) Domain Event>> {
+		String sandbox
+	}
+}
+Sandbox --> SandboxState : lifecycle
+
+
+@enduml

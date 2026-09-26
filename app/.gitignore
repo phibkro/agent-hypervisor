@@ -1,0 +1,5 @@
+.data
+.output
+node_modules
+.tanstack
+*.tsbuildinfo
