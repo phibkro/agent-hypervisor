@@ -116,14 +116,24 @@ The first real run is on your machine; the three things to watch are listed belo
    a different, deprecated shape. We use a custom `onPermissionRequest` instead, which
    is also where capalg plugs in.
 
+## Real omp against a small local model
+
+`scripts/omp-local-model.sh` runs unmodified omp 18.3.2 in ACP mode against Qwen3 1.7B
+served by Ollama; set it as `AGENT_CMD`. Verified in a 2-core, no-GPU container: omp
+registers `ask` behind the elicitation shim, the model calls it, the question renders
+as a card, and the answer reaches omp. Slow (first turn about 3 minutes, about 75 s
+per later model call) and the model's prose is weak; it tests the plumbing, not quality.
+
 ## On first real omp run, check
 
 - omp's permission requests carry useful `title`/`kind` (they become the grant key).
 - `omp acp` accepts `session/load` for the captured session id (turn 2 should not
   repeat history to omp).
 - How long omp takes to start per turn; the adapter spawns it once per run.
-- omp shows `ask` (its question tool) in ACP mode with our shim, and its `session/list`
-  finds TUI sessions for the project's directories.
+- ~~omp shows `ask` in ACP mode with our shim~~ verified with a local model.
+- omp's `session/list` finds TUI sessions for the project's directories.
+- Cancel against real omp closes the stream without a `RUN_ERROR` event (the fake agent
+  gets one), and a turn whose provider is unreachable kept retrying without ending the run.
 
 ## Layout
 
