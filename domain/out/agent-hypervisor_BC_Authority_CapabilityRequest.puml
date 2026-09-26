@@ -1,0 +1,42 @@
+@startuml
+
+skinparam componentStyle uml2
+
+package "'CapabilityRequest' Aggregate" <<Rectangle>> {
+	class CapabilityRequest <<(A,#fffab8) Aggregate Root>> {
+		String actingAgentId
+		String reason
+		CapabilityRequestId id
+		Principal requester
+		ResourceRef resource
+		Rights wanted
+		RequestDecision decision
+	}
+	class CapabilityRequestId <<(V,DarkSeaGreen) Value Object>> {
+		String value
+	}
+	enum RequestDecision {
+		PENDING
+		GRANTED_ONCE
+		GRANTED_FOR_SESSION
+		DENIED
+		EXPIRED
+		CANCELLED
+	}
+	class CapabilityRequested <<(E,#ff9f4b) Domain Event>> {
+		CapabilityRequestId request
+		Principal requester
+	}
+	class CapabilityRequestDecided <<(E,#ff9f4b) Domain Event>> {
+		CapabilityRequestId request
+		RequestDecision decision
+	}
+}
+CapabilityRequested --> CapabilityRequestId : request
+CapabilityRequest --> RequestDecision : decision
+CapabilityRequestDecided --> CapabilityRequestId : request
+CapabilityRequestDecided --> RequestDecision : decision
+CapabilityRequest --> CapabilityRequestId : id
+
+
+@enduml

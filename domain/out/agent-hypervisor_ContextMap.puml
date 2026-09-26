@@ -1,0 +1,126 @@
+@startuml
+
+skinparam componentStyle uml2
+
+component [ProjectCatalog]
+note right of [ProjectCatalog]
+The owner's projects, what each 
+project may touch, and the hosts 
+that hold it. 
+end note
+component [AgentCatalog]
+note right of [AgentCatalog]
+Named, versioned agent definitions: 
+which harness, which model, which 
+instructions and tools. 
+end note
+component [SessionOrchestration]
+note right of [SessionOrchestration]
+The hypervisor's scheduler: sessions, 
+their agents, and their turns. 
+
+end note
+component [Authority]
+note right of [Authority]
+Object-capability authority: holders, 
+rights lattices, modes, delegation, 
+revocation. 
+end note
+component [Isolation]
+note right of [Isolation]
+The hypervisor proper: one microVM 
+per session, enforcing authority 
+as mounts and egress rules. 
+end note
+component [HarnessGateway]
+note right of [HarnessGateway]
+Speak each harness's protocol; 
+expose one connection model to 
+orchestration. 
+end note
+component [Attention]
+note right of [Attention]
+One inbox for everything that 
+needs a person, answerable from 
+any device. 
+end note
+component [CredentialBrokerage]
+note right of [CredentialBrokerage]
+Resolve placeholders into real 
+credentials at the egress boundary, 
+only for holders of a secret capability. 
+
+end note
+component [SessionRecord]
+note right of [SessionRecord]
+Append-only record of every event, 
+decision and grant; the source 
+for transcripts and audits. 
+end note
+component [Harnesses]
+note right of [Harnesses]
+omp, Claude Code, Codex, pi: agent 
+loops we run but do not own. 
+end note
+component [ModelProviders]
+note right of [ModelProviders]
+Anthropic, OpenAI, local models: 
+reached only through the egress 
+proxy. 
+end note
+
+interface "Upstream-Downstream" as SessionOrchestration_to_ProjectCatalog
+[ProjectCatalog] --> SessionOrchestration_to_ProjectCatalog : OPEN_HOST_SERVICE
+SessionOrchestration_to_ProjectCatalog <.. [SessionOrchestration] : use Aggregate Project 
+
+interface "Upstream-Downstream" as Authority_to_ProjectCatalog
+[ProjectCatalog] --> Authority_to_ProjectCatalog : OPEN_HOST_SERVICE
+Authority_to_ProjectCatalog <.. [Authority] : use Aggregate Project 
+
+interface "Upstream-Downstream" as SessionOrchestration_to_Authority
+[Authority] --> SessionOrchestration_to_Authority : OPEN_HOST_SERVICE, PUBLISHED_LANGUAGE
+SessionOrchestration_to_Authority <.. [SessionOrchestration] : use Aggregate CapabilityRegistry 
+
+interface "Upstream-Downstream" as Isolation_to_Authority
+[Authority] --> Isolation_to_Authority : OPEN_HOST_SERVICE, PUBLISHED_LANGUAGE
+Isolation_to_Authority <.. [Isolation] : use Aggregate CapabilityRegistry 
+
+interface "Upstream-Downstream" as CredentialBrokerage_to_Authority
+[Authority] --> CredentialBrokerage_to_Authority : OPEN_HOST_SERVICE, PUBLISHED_LANGUAGE
+CredentialBrokerage_to_Authority <.. [CredentialBrokerage] : use Aggregate CapabilityRegistry 
+
+interface "Upstream-Downstream" as Attention_to_Authority
+[Authority] --> Attention_to_Authority : OPEN_HOST_SERVICE
+Attention_to_Authority <.. [Attention] : use Aggregate CapabilityRequest 
+
+interface "Customer-Supplier" as SessionOrchestration_to_AgentCatalog
+[AgentCatalog] --> SessionOrchestration_to_AgentCatalog : Supplier
+SessionOrchestration_to_AgentCatalog <.. [SessionOrchestration] : Customer of Aggregate AgentProfile 
+
+interface "Customer-Supplier" as SessionOrchestration_to_Isolation
+[Isolation] --> SessionOrchestration_to_Isolation : Supplier
+SessionOrchestration_to_Isolation <.. [SessionOrchestration] : Customer of Aggregate Sandbox 
+
+interface "Customer-Supplier" as SessionOrchestration_to_HarnessGateway
+[HarnessGateway] --> SessionOrchestration_to_HarnessGateway : Supplier
+SessionOrchestration_to_HarnessGateway <.. [SessionOrchestration] : Customer of Aggregate HarnessConnection 
+
+interface "Upstream-Downstream" as Attention_to_SessionOrchestration
+[SessionOrchestration] --> Attention_to_SessionOrchestration : OPEN_HOST_SERVICE
+Attention_to_SessionOrchestration <.. [Attention] : use Aggregate Session 
+
+interface "Upstream-Downstream" as SessionRecord_to_SessionOrchestration
+[SessionOrchestration] --> SessionRecord_to_SessionOrchestration : PUBLISHED_LANGUAGE
+SessionRecord_to_SessionOrchestration <.. [SessionRecord] : use Aggregate Session as CONFORMIST
+
+interface "ACP (Agent Client Protocol) over stdio; native SDKs later" as HarnessGateway_to_Harnesses
+[Harnesses] --> HarnessGateway_to_Harnesses : OPEN_HOST_SERVICE, PUBLISHED_LANGUAGE
+HarnessGateway_to_Harnesses <.. [HarnessGateway] : use via ANTICORRUPTION_LAYER
+
+interface "HTTPS egress proxy injecting credentials behind placeholders" as CredentialBrokerage_to_ModelProviders
+[ModelProviders] --> CredentialBrokerage_to_ModelProviders : OPEN_HOST_SERVICE
+CredentialBrokerage_to_ModelProviders <.. [CredentialBrokerage] : use via ANTICORRUPTION_LAYER
+
+
+
+@enduml

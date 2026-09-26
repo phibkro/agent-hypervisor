@@ -1,0 +1,99 @@
+@startuml
+
+skinparam componentStyle uml2
+
+package "'CapabilityRegistry' Aggregate" <<Rectangle>> {
+	class CapabilityRegistry <<(A,#fffab8) Aggregate Root>> {
+		int epoch
+		List<Capability> capabilities
+	}
+	class Capability <<(E,DarkSeaGreen) Entity>> {
+		int epoch
+		CapabilityId id
+		Principal holder
+		ResourceRef resource
+		Mode mode
+		Rights rights
+		CapabilityId derivedFrom
+	}
+	class CapabilityId <<(V,DarkSeaGreen) Value Object>> {
+		String value
+	}
+	class Principal <<(V,DarkSeaGreen) Value Object>> {
+		String id
+		PrincipalKind kind
+	}
+	enum PrincipalKind {
+		OWNER
+		PROJECT
+		SESSION
+		ORGANISATION
+	}
+	enum Mode {
+		ISO
+		VAL
+		TAG
+	}
+	class ResourceRef <<(V,DarkSeaGreen) Value Object>> {
+		String locator
+		ResourceKind kind
+	}
+	enum ResourceKind {
+		DIRECTORY
+		HTTP_ENDPOINT
+		SECRET
+		HOST
+		SANDBOX
+	}
+	class Rights <<(V,DarkSeaGreen) Value Object>> {
+		String lattice
+		String value
+	}
+	class CapabilityGranted <<(E,#ff9f4b) Domain Event>> {
+		CapabilityId capability
+		Principal holder
+	}
+	class CapabilityAttenuated <<(E,#ff9f4b) Domain Event>> {
+		CapabilityId capability
+		CapabilityId derivedFrom
+	}
+	class CapabilitySent <<(E,#ff9f4b) Domain Event>> {
+		CapabilityId capability
+		Principal recipient
+	}
+	class CapabilityFrozen <<(E,#ff9f4b) Domain Event>> {
+		CapabilityId capability
+	}
+	class CapabilityRevoked <<(E,#ff9f4b) Domain Event>> {
+		int epoch
+		CapabilityId capability
+	}
+	class CapabilityOperations <<(S,DarkSeaGreen) Service>> {
+		CapabilityId acquire(Principal holder, ResourceRef resource, Mode mode, Rights rights)
+		CapabilityId attenuate(CapabilityId capability, Rights narrower)
+		void send(CapabilityId capability, Principal recipient)
+		void freeze(CapabilityId capability)
+		void revoke(CapabilityId capability)
+		boolean authorize(Principal holder, ResourceRef resource, Rights needed)
+	}
+}
+Capability --> Principal : holder
+CapabilityGranted --> CapabilityId : capability
+CapabilityGranted --> Principal : holder
+ResourceRef --> ResourceKind : kind
+CapabilitySent --> CapabilityId : capability
+Capability --> Rights : rights
+CapabilityFrozen --> CapabilityId : capability
+Principal --> PrincipalKind : kind
+CapabilityAttenuated --> CapabilityId : derivedFrom
+CapabilitySent --> Principal : recipient
+Capability --> Mode : mode
+Capability --> CapabilityId : id
+Capability --> CapabilityId : derivedFrom
+Capability --> ResourceRef : resource
+CapabilityRegistry "1" *--> "*" Capability : capabilities
+CapabilityAttenuated --> CapabilityId : capability
+CapabilityRevoked --> CapabilityId : capability
+
+
+@enduml

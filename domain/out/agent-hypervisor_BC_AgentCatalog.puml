@@ -1,0 +1,31 @@
+@startuml
+
+skinparam componentStyle uml2
+
+package "'AgentProfile' Aggregate" <<Rectangle>> {
+	class AgentProfile <<(A,#fffab8) Aggregate Root>> {
+		String name
+		String harness
+		String model
+		String instructions
+		List<String> tools
+		List<String> requestedCapabilities
+		int version
+		AgentProfileId id
+		ProfileOwner ownedBy
+	}
+	class AgentProfileId <<(V,DarkSeaGreen) Value Object>> {
+		String value
+	}
+	class ProfileOwner <<(V,DarkSeaGreen) Value Object>> {
+		String projectId
+	}
+}
+AgentProfile --> AgentProfileId : id
+AgentProfile --> ProfileOwner : ownedBy
+legend left
+  This bounded context implements the subdomain 'SessionLifecycle'.
+end legend
+
+
+@enduml

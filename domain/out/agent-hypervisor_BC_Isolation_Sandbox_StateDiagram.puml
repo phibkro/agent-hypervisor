@@ -1,0 +1,23 @@
+@startuml
+
+skinparam componentStyle uml2
+
+RUNNING : 
+SUSPENDED : 
+DESTROYED : 
+PROVISIONING : 
+[*] --> PROVISIONING : provision
+PROVISIONING --> RUNNING : ready
+RUNNING --> SUSPENDED : suspend
+SUSPENDED --> RUNNING : resume
+RUNNING --> DESTROYED : destroy
+SUSPENDED --> DESTROYED : destroy
+PROVISIONING --> DESTROYED : destroy
+[*] --> PROVISIONING : cloneFromSnapshot
+
+
+legend top center
+  Sandbox Aggregate Lifecycle
+endlegend
+
+@enduml

@@ -1,0 +1,66 @@
+@startuml
+
+skinparam componentStyle uml2
+
+package "'Sandbox' Aggregate" <<Rectangle>> {
+	class Sandbox <<(A,#fffab8) Aggregate Root>> {
+		SandboxId id
+		HostRef host
+		List<Mount> mounts
+		EgressPolicy egress
+		SandboxState lifecycle
+	}
+	class SandboxId <<(V,DarkSeaGreen) Value Object>> {
+		String value
+	}
+	class HostRef <<(V,DarkSeaGreen) Value Object>> {
+		String hostId
+	}
+	class Mount <<(V,DarkSeaGreen) Value Object>> {
+		String hostPath
+		String guestPath
+		boolean writable
+		String capabilityId
+	}
+	class EgressPolicy <<(V,DarkSeaGreen) Value Object>> {
+		String proxyAddress
+		String allowedHosts
+	}
+	enum SandboxState {
+		PROVISIONING
+		RUNNING
+		SUSPENDED
+		DESTROYED
+	}
+	class SandboxProvisioned <<(E,#ff9f4b) Domain Event>> {
+		SandboxId sandbox
+	}
+	class SandboxSuspended <<(E,#ff9f4b) Domain Event>> {
+		String snapshot
+		SandboxId sandbox
+	}
+	class MountAttached <<(E,#ff9f4b) Domain Event>> {
+		SandboxId sandbox
+		Mount mount
+	}
+	class SandboxLifecycle <<(S,DarkSeaGreen) Service>> {
+		SandboxId provision(HostRef host)
+		void ready(SandboxId sandbox)
+		void suspend(SandboxId sandbox)
+		void resume(SandboxId sandbox)
+		void destroy(SandboxId sandbox)
+		SandboxId cloneFromSnapshot(SandboxId sandbox)
+	}
+}
+Sandbox --> HostRef : host
+Sandbox --> SandboxState : lifecycle
+SandboxProvisioned --> SandboxId : sandbox
+Sandbox --> SandboxId : id
+Sandbox "1" *--> "*" Mount : mounts
+MountAttached --> SandboxId : sandbox
+Sandbox --> EgressPolicy : egress
+SandboxSuspended --> SandboxId : sandbox
+MountAttached --> Mount : mount
+
+
+@enduml

@@ -1,0 +1,141 @@
+@startuml
+
+skinparam componentStyle uml2
+
+package "'CapabilityRegistry' Aggregate" <<Rectangle>> {
+	class CapabilityRegistry <<(A,#fffab8) Aggregate Root>> {
+		int epoch
+		List<Capability> capabilities
+	}
+	class Capability <<(E,DarkSeaGreen) Entity>> {
+		int epoch
+		CapabilityId id
+		Principal holder
+		ResourceRef resource
+		Mode mode
+		Rights rights
+		CapabilityId derivedFrom
+	}
+	class CapabilityId <<(V,DarkSeaGreen) Value Object>> {
+		String value
+	}
+	class Principal <<(V,DarkSeaGreen) Value Object>> {
+		String id
+		PrincipalKind kind
+	}
+	enum PrincipalKind {
+		OWNER
+		PROJECT
+		SESSION
+		ORGANISATION
+	}
+	enum Mode {
+		ISO
+		VAL
+		TAG
+	}
+	class ResourceRef <<(V,DarkSeaGreen) Value Object>> {
+		String locator
+		ResourceKind kind
+	}
+	enum ResourceKind {
+		DIRECTORY
+		HTTP_ENDPOINT
+		SECRET
+		HOST
+		SANDBOX
+	}
+	class Rights <<(V,DarkSeaGreen) Value Object>> {
+		String lattice
+		String value
+	}
+	class CapabilityGranted <<(E,#ff9f4b) Domain Event>> {
+		CapabilityId capability
+		Principal holder
+	}
+	class CapabilityAttenuated <<(E,#ff9f4b) Domain Event>> {
+		CapabilityId capability
+		CapabilityId derivedFrom
+	}
+	class CapabilitySent <<(E,#ff9f4b) Domain Event>> {
+		CapabilityId capability
+		Principal recipient
+	}
+	class CapabilityFrozen <<(E,#ff9f4b) Domain Event>> {
+		CapabilityId capability
+	}
+	class CapabilityRevoked <<(E,#ff9f4b) Domain Event>> {
+		int epoch
+		CapabilityId capability
+	}
+	class CapabilityOperations <<(S,DarkSeaGreen) Service>> {
+		CapabilityId acquire(Principal holder, ResourceRef resource, Mode mode, Rights rights)
+		CapabilityId attenuate(CapabilityId capability, Rights narrower)
+		void send(CapabilityId capability, Principal recipient)
+		void freeze(CapabilityId capability)
+		void revoke(CapabilityId capability)
+		boolean authorize(Principal holder, ResourceRef resource, Rights needed)
+	}
+}
+package "'CapabilityRequest' Aggregate" <<Rectangle>> {
+	class CapabilityRequest <<(A,#fffab8) Aggregate Root>> {
+		String actingAgentId
+		String reason
+		CapabilityRequestId id
+		Principal requester
+		ResourceRef resource
+		Rights wanted
+		RequestDecision decision
+	}
+	class CapabilityRequestId <<(V,DarkSeaGreen) Value Object>> {
+		String value
+	}
+	enum RequestDecision {
+		PENDING
+		GRANTED_ONCE
+		GRANTED_FOR_SESSION
+		DENIED
+		EXPIRED
+		CANCELLED
+	}
+	class CapabilityRequested <<(E,#ff9f4b) Domain Event>> {
+		CapabilityRequestId request
+		Principal requester
+	}
+	class CapabilityRequestDecided <<(E,#ff9f4b) Domain Event>> {
+		CapabilityRequestId request
+		RequestDecision decision
+	}
+}
+CapabilityRequest --> RequestDecision : decision
+Capability --> Principal : holder
+CapabilityGranted --> Principal : holder
+CapabilitySent --> CapabilityId : capability
+CapabilityRequest --> ResourceRef : resource
+CapabilityAttenuated --> CapabilityId : derivedFrom
+CapabilityRequest --> Principal : requester
+Capability --> Mode : mode
+Capability --> CapabilityId : id
+Capability --> CapabilityId : derivedFrom
+CapabilityRequestDecided --> CapabilityRequestId : request
+CapabilityRequestDecided --> RequestDecision : decision
+Capability --> ResourceRef : resource
+CapabilityRevoked --> CapabilityId : capability
+CapabilityRequested --> CapabilityRequestId : request
+CapabilityGranted --> CapabilityId : capability
+ResourceRef --> ResourceKind : kind
+Capability --> Rights : rights
+CapabilityFrozen --> CapabilityId : capability
+Principal --> PrincipalKind : kind
+CapabilitySent --> Principal : recipient
+CapabilityRequest --> Rights : wanted
+CapabilityRequested --> Principal : requester
+CapabilityRegistry "1" *--> "*" Capability : capabilities
+CapabilityAttenuated --> CapabilityId : capability
+CapabilityRequest --> CapabilityRequestId : id
+legend left
+  This bounded context implements the subdomain 'AuthorityModel'.
+end legend
+
+
+@enduml

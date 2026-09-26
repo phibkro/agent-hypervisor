@@ -1,0 +1,79 @@
+digraph "ContextMapGraph" {
+graph ["imagepath"="/tmp/GraphvizJava"]
+"AgentCatalog" ["margin"="0.3","orientation"="162","shape"="egg","fontsize"="16","style"="bold","label"="AgentCatalog\n","fontname"="sans-serif"]
+"SessionOrchestration" ["margin"="0.3","orientation"="344","shape"="egg","fontsize"="16","style"="bold","label"="SessionOrchestration\n","fontname"="sans-serif"]
+"SessionRecord" ["margin"="0.3","orientation"="310","shape"="egg","fontsize"="16","style"="bold","label"="SessionRecord\n","fontname"="sans-serif"]
+"Attention" ["margin"="0.3","orientation"="175","shape"="egg","fontsize"="16","style"="bold","label"="Attention\n","fontname"="sans-serif"]
+"Authority" ["margin"="0.3","orientation"="146","shape"="egg","fontsize"="16","style"="bold","label"="Authority\n","fontname"="sans-serif"]
+"Isolation" ["margin"="0.3","orientation"="332","shape"="egg","fontsize"="16","style"="bold","label"="Isolation\n","fontname"="sans-serif"]
+"CredentialBrokerage" ["margin"="0.3","orientation"="90","shape"="egg","fontsize"="16","style"="bold","label"="CredentialBrokerage\n","fontname"="sans-serif"]
+"HarnessGateway" ["margin"="0.3","orientation"="161","shape"="egg","fontsize"="16","style"="bold","label"="HarnessGateway\n","fontname"="sans-serif"]
+"Harnesses" ["margin"="0.3","orientation"="18","shape"="egg","fontsize"="16","style"="bold","label"="Harnesses\n","fontname"="sans-serif"]
+"ModelProviders" ["margin"="0.3","orientation"="167","shape"="egg","fontsize"="16","style"="bold","label"="ModelProviders\n","fontname"="sans-serif"]
+"ProjectCatalog" ["margin"="0.3","orientation"="289","shape"="egg","fontsize"="16","style"="bold","label"="ProjectCatalog\n","fontname"="sans-serif"]
+"AgentCatalog" -> "SessionOrchestration" ["headlabel"=<<table cellspacing="0" cellborder="0" border="0">
+<tr><td bgcolor="white">D</td></tr>
+</table>>,"labeldistance"="0","fontsize"="12","taillabel"=<<table cellspacing="0" cellborder="0" border="0">
+<tr><td bgcolor="white">U</td></tr>
+</table>>,"style"="bold","label"="Customer/Supplier","dir"="none","fontname"="sans-serif"]
+"SessionOrchestration" -> "SessionRecord" ["headlabel"=<<table cellspacing="0" cellborder="1" border="0">
+<tr><td bgcolor="white" sides="r">D</td><td sides="trbl" bgcolor="white"><font>CF</font></td></tr>
+</table>>,"labeldistance"="0","fontsize"="12","taillabel"=<<table cellspacing="0" cellborder="1" border="0">
+<tr><td bgcolor="white" sides="r">U</td><td sides="trbl" bgcolor="white"><font>PL</font></td></tr>
+</table>>,"style"="bold","label"="                                        ","dir"="none","fontname"="sans-serif"]
+"SessionOrchestration" -> "Attention" ["headlabel"=<<table cellspacing="0" cellborder="0" border="0">
+<tr><td bgcolor="white">D</td></tr>
+</table>>,"labeldistance"="0","fontsize"="12","taillabel"=<<table cellspacing="0" cellborder="1" border="0">
+<tr><td bgcolor="white" sides="r">U</td><td sides="trbl" bgcolor="white"><font>OHS</font></td></tr>
+</table>>,"style"="bold","label"="                                        ","dir"="none","fontname"="sans-serif"]
+"Authority" -> "SessionOrchestration" ["headlabel"=<<table cellspacing="0" cellborder="0" border="0">
+<tr><td bgcolor="white">D</td></tr>
+</table>>,"labeldistance"="0","fontsize"="12","taillabel"=<<table cellspacing="0" cellborder="1" border="0">
+<tr><td bgcolor="white" sides="r">U</td><td sides="trbl" bgcolor="white"><font>OHS, PL</font></td></tr>
+</table>>,"style"="bold","label"="                                        ","dir"="none","fontname"="sans-serif"]
+"Authority" -> "Isolation" ["headlabel"=<<table cellspacing="0" cellborder="0" border="0">
+<tr><td bgcolor="white">D</td></tr>
+</table>>,"labeldistance"="0","fontsize"="12","taillabel"=<<table cellspacing="0" cellborder="1" border="0">
+<tr><td bgcolor="white" sides="r">U</td><td sides="trbl" bgcolor="white"><font>OHS, PL</font></td></tr>
+</table>>,"style"="bold","label"="                                        ","dir"="none","fontname"="sans-serif"]
+"Authority" -> "CredentialBrokerage" ["headlabel"=<<table cellspacing="0" cellborder="0" border="0">
+<tr><td bgcolor="white">D</td></tr>
+</table>>,"labeldistance"="0","fontsize"="12","taillabel"=<<table cellspacing="0" cellborder="1" border="0">
+<tr><td bgcolor="white" sides="r">U</td><td sides="trbl" bgcolor="white"><font>OHS, PL</font></td></tr>
+</table>>,"style"="bold","label"="                                        ","dir"="none","fontname"="sans-serif"]
+"Authority" -> "Attention" ["headlabel"=<<table cellspacing="0" cellborder="0" border="0">
+<tr><td bgcolor="white">D</td></tr>
+</table>>,"labeldistance"="0","fontsize"="12","taillabel"=<<table cellspacing="0" cellborder="1" border="0">
+<tr><td bgcolor="white" sides="r">U</td><td sides="trbl" bgcolor="white"><font>OHS</font></td></tr>
+</table>>,"style"="bold","label"="                                        ","dir"="none","fontname"="sans-serif"]
+"Isolation" -> "SessionOrchestration" ["headlabel"=<<table cellspacing="0" cellborder="0" border="0">
+<tr><td bgcolor="white">D</td></tr>
+</table>>,"labeldistance"="0","fontsize"="12","taillabel"=<<table cellspacing="0" cellborder="0" border="0">
+<tr><td bgcolor="white">U</td></tr>
+</table>>,"style"="bold","label"="Customer/Supplier","dir"="none","fontname"="sans-serif"]
+"HarnessGateway" -> "SessionOrchestration" ["headlabel"=<<table cellspacing="0" cellborder="0" border="0">
+<tr><td bgcolor="white">D</td></tr>
+</table>>,"labeldistance"="0","fontsize"="12","taillabel"=<<table cellspacing="0" cellborder="0" border="0">
+<tr><td bgcolor="white">U</td></tr>
+</table>>,"style"="bold","label"="Customer/Supplier","dir"="none","fontname"="sans-serif"]
+"Harnesses" -> "HarnessGateway" ["headlabel"=<<table cellspacing="0" cellborder="1" border="0">
+<tr><td bgcolor="white" sides="r">D</td><td sides="trbl" bgcolor="white"><font>ACL</font></td></tr>
+</table>>,"labeldistance"="0","fontsize"="12","taillabel"=<<table cellspacing="0" cellborder="1" border="0">
+<tr><td bgcolor="white" sides="r">U</td><td sides="trbl" bgcolor="white"><font>OHS, PL</font></td></tr>
+</table>>,"style"="bold","label"="                                        ","dir"="none","fontname"="sans-serif"]
+"ModelProviders" -> "CredentialBrokerage" ["headlabel"=<<table cellspacing="0" cellborder="1" border="0">
+<tr><td bgcolor="white" sides="r">D</td><td sides="trbl" bgcolor="white"><font>ACL</font></td></tr>
+</table>>,"labeldistance"="0","fontsize"="12","taillabel"=<<table cellspacing="0" cellborder="1" border="0">
+<tr><td bgcolor="white" sides="r">U</td><td sides="trbl" bgcolor="white"><font>OHS</font></td></tr>
+</table>>,"style"="bold","label"="                                        ","dir"="none","fontname"="sans-serif"]
+"ProjectCatalog" -> "SessionOrchestration" ["headlabel"=<<table cellspacing="0" cellborder="0" border="0">
+<tr><td bgcolor="white">D</td></tr>
+</table>>,"labeldistance"="0","fontsize"="12","taillabel"=<<table cellspacing="0" cellborder="1" border="0">
+<tr><td bgcolor="white" sides="r">U</td><td sides="trbl" bgcolor="white"><font>OHS</font></td></tr>
+</table>>,"style"="bold","label"="                                        ","dir"="none","fontname"="sans-serif"]
+"ProjectCatalog" -> "Authority" ["headlabel"=<<table cellspacing="0" cellborder="0" border="0">
+<tr><td bgcolor="white">D</td></tr>
+</table>>,"labeldistance"="0","fontsize"="12","taillabel"=<<table cellspacing="0" cellborder="1" border="0">
+<tr><td bgcolor="white" sides="r">U</td><td sides="trbl" bgcolor="white"><font>OHS</font></td></tr>
+</table>>,"style"="bold","label"="                                        ","dir"="none","fontname"="sans-serif"]
+}

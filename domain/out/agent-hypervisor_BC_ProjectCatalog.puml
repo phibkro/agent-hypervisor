@@ -1,0 +1,56 @@
+@startuml
+
+skinparam componentStyle uml2
+
+package "'Project' Aggregate" <<Rectangle>> {
+	class Project <<(A,#fffab8) Aggregate Root>> {
+		String name
+		ProjectId id
+		List<ProjectResource> resources
+	}
+	class ProjectId <<(V,DarkSeaGreen) Value Object>> {
+		String value
+	}
+	class ProjectResource <<(E,DarkSeaGreen) Entity>> {
+		String locator
+		String capabilityId
+		ProjectResourceId id
+		ProjectResourceKind kind
+		HostId host
+	}
+	class ProjectResourceId <<(V,DarkSeaGreen) Value Object>> {
+		String value
+	}
+	enum ProjectResourceKind {
+		REPOSITORY
+		HOST_DIRECTORY
+		SECRET
+		HTTP_ENDPOINT
+	}
+	class ProjectCreated <<(E,#ff9f4b) Domain Event>> {
+		ProjectId project
+	}
+}
+package "'Host' Aggregate" <<Rectangle>> {
+	class Host <<(A,#fffab8) Aggregate Root>> {
+		String name
+		String tailnetAddress
+		HostId id
+	}
+	class HostId <<(V,DarkSeaGreen) Value Object>> {
+		String value
+	}
+}
+Host --> HostId : id
+Project --> ProjectId : id
+ProjectResource --> ProjectResourceKind : kind
+ProjectResource --> HostId : host
+Project "1" *--> "*" ProjectResource : resources
+ProjectResource --> ProjectResourceId : id
+ProjectCreated --> ProjectId : project
+legend left
+  This bounded context implements the subdomain 'ProjectManagement'.
+end legend
+
+
+@enduml

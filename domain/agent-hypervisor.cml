@@ -1,0 +1,512 @@
+/*
+ * Agent Hypervisor: domain model, draft 1.
+ * Scope (MVP): one Owner > Projects > Sessions > Agents. No multi-tenancy; an Organisation
+ * can later be inserted above Owner as another principal. Open questions are marked OPEN.
+ *
+ * Decided (interview round 1):
+ * - The Session is the security principal; agents act inside it and are recorded for audit.
+ * - A Project is a container of resources (repos, host directories, secrets, endpoints).
+ * - An Agent has a reusable definition (AgentProfile) and running instances (lead, subagents).
+ * - Sandbox and Session are 1:1; the sandbox suspends when the session goes inactive.
+ * Decided (interview round 2):
+ * - Parallel sessions on one repository each get their own worktree (iso); merging back is a separate, authorized act.
+ * - The session's creator answers its capability requests.
+ * Decided (round 3): single user for the MVP. The Owner holds root authority, owns every
+ *   credential and answers every capability request, so no approver can lack the authority it grants.
+ * Decided (round 4): merging worktrees back happens outside the system; one host for the MVP.
+ * - The agent tree is observed, best effort: recorded when a harness reports subagents.
+ */
+
+ContextMap AgentHypervisorMap {
+  type = SYSTEM_LANDSCAPE
+  state = TO_BE
+
+  contains ProjectCatalog, AgentCatalog, SessionOrchestration, Authority, Isolation, HarnessGateway,
+           Attention, CredentialBrokerage, SessionRecord, Harnesses, ModelProviders
+
+  /* The catalog owns which projects, resources and hosts exist; others refer to its ids. */
+  ProjectCatalog [U,OHS] -> [D] SessionOrchestration {
+    exposedAggregates = Project
+  }
+  ProjectCatalog [U,OHS] -> [D] Authority {
+    exposedAggregates = Project
+  }
+
+  /* Authority is the published language of permission: capabilities, rights, grants. */
+  Authority [U,OHS,PL] -> [D] SessionOrchestration {
+    exposedAggregates = CapabilityRegistry
+  }
+  Authority [U,OHS,PL] -> [D] Isolation {
+    exposedAggregates = CapabilityRegistry
+  }
+  Authority [U,OHS,PL] -> [D] CredentialBrokerage {
+    exposedAggregates = CapabilityRegistry
+  }
+  Authority [U,OHS] -> [D] Attention {
+    exposedAggregates = CapabilityRequest
+  }
+
+  AgentCatalog [S] -> [C] SessionOrchestration {
+    exposedAggregates = AgentProfile
+  }
+
+  /* Orchestration is the customer of the machinery that runs agents. */
+  Isolation [S] -> [C] SessionOrchestration {
+    exposedAggregates = Sandbox
+  }
+  HarnessGateway [S] -> [C] SessionOrchestration {
+    exposedAggregates = HarnessConnection
+  }
+  SessionOrchestration [U,OHS] -> [D] Attention {
+    exposedAggregates = Session
+  }
+  SessionOrchestration [U,PL] -> [D,CF] SessionRecord {
+    exposedAggregates = Session
+  }
+
+  /* External systems, kept behind anticorruption layers. */
+  Harnesses [U,OHS,PL] -> [D,ACL] HarnessGateway {
+    implementationTechnology = "ACP (Agent Client Protocol) over stdio; native SDKs later"
+  }
+  ModelProviders [U,OHS] -> [D,ACL] CredentialBrokerage {
+    implementationTechnology = "HTTPS egress proxy injecting credentials behind placeholders"
+  }
+}
+
+Domain AgentHypervisor {
+  domainVisionStatement = "Run any coding-agent harness under granular, provable authority, and let humans supervise it from anywhere."
+
+  Subdomain SessionLifecycle {
+    type = CORE_DOMAIN
+    domainVisionStatement = "What a unit of agent work is, how it starts, pauses, resumes, forks and ends."
+  }
+  Subdomain AuthorityModel {
+    type = CORE_DOMAIN
+    domainVisionStatement = "Capability algebra (iso, val, tag) deciding what any agent may touch, and how authority is delegated and revoked."
+  }
+  Subdomain Isolation {
+    type = CORE_DOMAIN
+    domainVisionStatement = "Per-session microVM sandboxes that enforce granted authority at the machine boundary."
+  }
+  Subdomain HumanOversight {
+    type = SUPPORTING_DOMAIN
+    domainVisionStatement = "Everything that needs a person: approvals, agent questions, notifications, from any device."
+  }
+  Subdomain HarnessAdaptation {
+    type = SUPPORTING_DOMAIN
+    domainVisionStatement = "Translate omp, Claude Code, Codex and pi into one session model."
+  }
+  Subdomain SecretHandling {
+    type = SUPPORTING_DOMAIN
+    domainVisionStatement = "Agents use credentials without ever seeing them."
+  }
+  Subdomain Audit {
+    type = SUPPORTING_DOMAIN
+    domainVisionStatement = "A complete, replayable record of what happened and who authorized it."
+  }
+  Subdomain ProjectManagement {
+    type = GENERIC_SUBDOMAIN
+    domainVisionStatement = "The owner's projects, their resources, and the hosts they live on."
+  }
+}
+
+/* ------------------------------------------------------------- ProjectCatalog */
+
+BoundedContext ProjectCatalog implements ProjectManagement {
+  type = FEATURE
+  domainVisionStatement = "The owner's projects, what each project may touch, and the hosts that hold it."
+  responsibilities = "Projects", "Project resources", "Hosts"
+
+  /* MVP: one implicit Owner (the single user). Not modelled as an aggregate; it is the
+     root principal in Authority. Multi-tenancy later adds Organisation and Member above it. */
+
+  Aggregate Project {
+    Entity Project {
+      aggregateRoot
+      - ProjectId id
+      String name
+      - List<ProjectResource> resources
+    }
+    ValueObject ProjectId { String value key }
+    /* A project is a container of resources; a directory on a host is one kind.
+       The project's authority over each resource is a capability it holds (see Authority). */
+    Entity ProjectResource {
+      - ProjectResourceId id
+      - ProjectResourceKind kind
+      String locator
+      - HostId host
+      String capabilityId
+    }
+    ValueObject ProjectResourceId { String value key }
+    enum ProjectResourceKind { REPOSITORY, HOST_DIRECTORY, SECRET, HTTP_ENDPOINT }
+    DomainEvent ProjectCreated { - ProjectId project }
+  }
+
+  /* MVP: exactly one host, the machine running the control plane. Kept as an aggregate
+     so sessions can later be placed on several tailnet machines. */
+  Aggregate Host {
+    Entity Host {
+      aggregateRoot
+      - HostId id
+      String name
+      String tailnetAddress
+    }
+    ValueObject HostId { String value key }
+  }
+}
+
+/* ------------------------------------------------------- SessionOrchestration */
+
+BoundedContext SessionOrchestration implements SessionLifecycle {
+  type = FEATURE
+  domainVisionStatement = "The hypervisor's scheduler: sessions, their agents, and their turns."
+  responsibilities = "Session lifecycle", "Agent tree", "Turns", "Status derivation", "Import and fork"
+
+  Aggregate Session {
+    Entity Session {
+      aggregateRoot
+      - SessionId id
+      - ProjectId project
+      String title
+      - Checkout checkout
+      - AgentId leadAgent
+      - List<Agent> agents
+      - SandboxRef sandbox
+      - HarnessSessionRef harnessSession
+      - SessionFacts facts
+      - SessionOrigin origin
+    }
+    ValueObject SessionId { String value key }
+    ValueObject SandboxRef { String sandboxId }
+    /* The session's own worktree of a project repository: the session holds iso over it.
+       Merging back is done by the owner outside the system (branch push, PR) for the MVP. */
+    ValueObject Checkout {
+      String repositoryResourceId
+      String branch
+      String worktreePath
+    }
+    /* The harness's own id for the conversation (omp JSONL, Claude Code JSONL, Codex rollout). */
+    ValueObject HarnessSessionRef {
+      String harness
+      String externalId
+    }
+    /* Status is derived from facts, never stored:
+       needs-you > running > active > inactive (15 min) > archived; archive outranked by later activity. */
+    ValueObject SessionFacts {
+      boolean running
+      int pendingRequests
+      long lastActivityAt
+      long archivedAt
+    }
+    enum SessionOrigin { CREATED, IMPORTED, FORKED }
+
+    /* One lead agent per session; subagents form a tree under it.
+       Agents are actors, not principals: they share the session's authority and are
+       recorded on every event and capability request for attribution. */
+    Entity Agent {
+      - AgentId id
+      - AgentId parent
+      - AgentRole role
+      - AgentProfileRef profile
+      - AgentObservation observedVia
+    }
+    /* The lead is known; subagents are known only if the harness reports them. */
+    enum AgentObservation { STARTED_BY_CONTROL_PLANE, REPORTED_BY_HARNESS }
+    ValueObject AgentId { String value key }
+    enum AgentRole { LEAD, SUBAGENT }
+    ValueObject AgentProfileRef { String profileId }
+
+    /* A turn: one user message and everything the agent did until it stopped. */
+    Entity Turn {
+      - TurnId id
+      - SessionId session
+      long startedAt
+      long endedAt
+      - StopReason stopReason
+    }
+    ValueObject TurnId { String value key }
+    enum StopReason { END_TURN, CANCELLED, ERROR, MAX_TOKENS, REFUSAL }
+
+    DomainEvent SessionStarted {
+      - SessionId session
+      - ProjectId project
+      - AgentId leadAgent
+    }
+    DomainEvent SubagentSpawned {
+      - SessionId session
+      - AgentId agent
+      - AgentId parent
+    }
+    DomainEvent TurnStarted { - SessionId session - TurnId turn }
+    DomainEvent TurnEnded { - SessionId session - TurnId turn - StopReason stopReason }
+    DomainEvent SessionArchived { - SessionId session }
+    DomainEvent SessionForked { - SessionId session - SessionId forkedFrom }
+
+    /* Status is derived, so crossing the 15-minute threshold emits nothing by itself;
+       an idle watcher observes it and raises this event, which suspends the sandbox. */
+    DomainEvent SessionWentInactive { - SessionId session }
+    DomainEvent SessionReactivated { - SessionId session }
+
+    Service SessionCommands {
+      @SessionId start(@ProjectId project, @AgentProfileRef lead);
+      @TurnId prompt(@SessionId session, String message);
+      void cancel(@SessionId session);
+      @SessionId fork(@SessionId session);
+      @SessionId importFromHarness(@ProjectId project, @HarnessSessionRef ref);
+      void archive(@SessionId session);
+    }
+  }
+}
+
+/* Reusable agent definitions, instantiated as a session's lead or as subagents. */
+BoundedContext AgentCatalog implements SessionLifecycle {
+  type = FEATURE
+  domainVisionStatement = "Named, versioned agent definitions: which harness, which model, which instructions and tools."
+  responsibilities = "Agent profiles", "Profile versions", "Default authority requests"
+
+  Aggregate AgentProfile {
+    Entity AgentProfile {
+      aggregateRoot
+      - AgentProfileId id
+      - ProfileOwner ownedBy
+      String name
+      String harness
+      String model
+      String instructions
+      List<String> tools
+      /* What a session started from this profile asks for up front, within the project's envelope. */
+      List<String> requestedCapabilities
+      int version
+    }
+    ValueObject AgentProfileId { String value key }
+    /* Global profiles, or project-specific ones (a project can override a global profile). */
+    ValueObject ProfileOwner {
+      String projectId
+    }
+  }
+}
+
+/* ------------------------------------------------------------------ Authority */
+
+BoundedContext Authority implements AuthorityModel {
+  type = FEATURE
+  domainVisionStatement = "Object-capability authority: holders, rights lattices, modes, delegation, revocation."
+  responsibilities = "Capability registry", "Attenuation and delegation", "Iso ownership", "Revocation by epoch", "Capability requests (escalation)"
+  implementationTechnology = "Rust (capalg): lattice rights, typed move-only handles, proptest and Kani"
+
+  Aggregate CapabilityRegistry {
+    Entity CapabilityRegistry {
+      aggregateRoot
+      - List<Capability> capabilities
+      int epoch
+    }
+    Entity Capability {
+      - CapabilityId id
+      - Principal holder
+      - ResourceRef resource
+      - Mode mode
+      - Rights rights
+      - CapabilityId derivedFrom
+      int epoch
+    }
+    ValueObject CapabilityId { String value key }
+    /* Principals follow containment: Owner > Project > Session, each holding a narrowing
+       of its parent's authority. Agents are not principals. ORGANISATION is reserved for
+       later multi-tenancy. */
+    ValueObject Principal {
+      - PrincipalKind kind
+      String id
+    }
+    enum PrincipalKind { OWNER, PROJECT, SESSION, ORGANISATION }
+    /* Pony-style reference capabilities: iso = exclusive write, val = shared immutable, tag = identity only. */
+    enum Mode { ISO, VAL, TAG }
+    ValueObject ResourceRef {
+      - ResourceKind kind
+      String locator
+    }
+    enum ResourceKind { DIRECTORY, HTTP_ENDPOINT, SECRET, HOST, SANDBOX }
+    /* Rights form a lattice per resource kind (FsRights, HttpScope, SecretRights). */
+    ValueObject Rights {
+      String lattice
+      String value
+    }
+
+    DomainEvent CapabilityGranted { - CapabilityId capability - Principal holder }
+    DomainEvent CapabilityAttenuated { - CapabilityId capability - CapabilityId derivedFrom }
+    DomainEvent CapabilitySent { - CapabilityId capability - Principal recipient }
+    DomainEvent CapabilityFrozen { - CapabilityId capability }
+    DomainEvent CapabilityRevoked { - CapabilityId capability int epoch }
+
+    Service CapabilityOperations {
+      @CapabilityId acquire(@Principal holder, @ResourceRef resource, @Mode mode, @Rights rights);
+      @CapabilityId attenuate(@CapabilityId capability, @Rights narrower);
+      void send(@CapabilityId capability, @Principal recipient);
+      void freeze(@CapabilityId capability);
+      void revoke(@CapabilityId capability);
+      boolean authorize(@Principal holder, @ResourceRef resource, @Rights needed);
+    }
+  }
+
+  /* Suggestion: an approval is an agent asking for authority it does not hold.
+     A human who holds it answers by delegating (once, for the session) or refusing. */
+  Aggregate CapabilityRequest {
+    Entity CapabilityRequest {
+      aggregateRoot
+      - CapabilityRequestId id
+      - Principal requester
+      String actingAgentId
+      - ResourceRef resource
+      - Rights wanted
+      String reason
+      - RequestDecision decision
+    }
+    /* The Owner decides (MVP: the only user, holding root authority, so every grant is a
+       delegation from something already held). */
+    ValueObject CapabilityRequestId { String value key }
+    enum RequestDecision { PENDING, GRANTED_ONCE, GRANTED_FOR_SESSION, DENIED, EXPIRED, CANCELLED }
+    DomainEvent CapabilityRequested { - CapabilityRequestId request - Principal requester }
+    DomainEvent CapabilityRequestDecided { - CapabilityRequestId request - RequestDecision decision }
+  }
+}
+
+/* ------------------------------------------------------------------ Isolation */
+
+BoundedContext Isolation implements Isolation {
+  type = FEATURE
+  domainVisionStatement = "The hypervisor proper: one microVM per session, enforcing authority as mounts and egress rules."
+  responsibilities = "Sandbox lifecycle", "Mounts (virtio-fs)", "Egress policy", "Snapshots"
+  implementationTechnology = "Cloud Hypervisor, virtio-fs, vm.add-fs hotplug, snapshot/restore"
+
+  Aggregate Sandbox {
+    Entity Sandbox {
+      aggregateRoot
+      - SandboxId id
+      - HostRef host
+      - List<Mount> mounts
+      - EgressPolicy egress
+      - SandboxState lifecycle
+    }
+    ValueObject SandboxId { String value key }
+    ValueObject HostRef { String hostId }
+    /* A mount is the physical form of a directory capability. */
+    ValueObject Mount {
+      String hostPath
+      String guestPath
+      boolean writable
+      String capabilityId
+    }
+    ValueObject EgressPolicy {
+      String proxyAddress
+      String allowedHosts
+    }
+    enum SandboxState {
+      aggregateLifecycle
+      PROVISIONING, RUNNING, SUSPENDED, DESTROYED
+    }
+    DomainEvent SandboxProvisioned { - SandboxId sandbox }
+    DomainEvent SandboxSuspended { - SandboxId sandbox String snapshot }
+    DomainEvent MountAttached { - SandboxId sandbox - Mount mount }
+
+    Service SandboxLifecycle {
+      @SandboxId provision(@HostRef host) : write [ -> PROVISIONING ];
+      void ready(@SandboxId sandbox) : write [ PROVISIONING -> RUNNING ];
+      void suspend(@SandboxId sandbox) : write [ RUNNING -> SUSPENDED ];
+      void resume(@SandboxId sandbox) : write [ SUSPENDED -> RUNNING ];
+      void destroy(@SandboxId sandbox) : write [ PROVISIONING, RUNNING, SUSPENDED -> DESTROYED ];
+      @SandboxId cloneFromSnapshot(@SandboxId sandbox) : write [ -> PROVISIONING ];
+    }
+  }
+}
+
+/* ------------------------------------------------------------ HarnessGateway */
+
+BoundedContext HarnessGateway implements HarnessAdaptation {
+  type = FEATURE
+  domainVisionStatement = "Speak each harness's protocol; expose one connection model to orchestration."
+  responsibilities = "Harness adapters", "ACP translation", "Elicitation shim", "Session listing and replay"
+
+  Aggregate HarnessConnection {
+    Entity HarnessConnection {
+      aggregateRoot
+      - HarnessConnectionId id
+      - HarnessKind harness
+      String sessionId
+      String sandboxId
+      List<String> advertisedCapabilities
+    }
+    ValueObject HarnessConnectionId { String value key }
+    enum HarnessKind { OMP, CLAUDE_CODE, CODEX, PI, CUSTOM }
+  }
+}
+
+/* ------------------------------------------------------------------ Attention */
+
+BoundedContext Attention implements HumanOversight {
+  type = FEATURE
+  domainVisionStatement = "One inbox for everything that needs a person, answerable from any device."
+  responsibilities = "Pending items", "Agent questions (elicitation)", "Notifications", "Timeouts"
+
+  Aggregate AttentionItem {
+    Entity AttentionItem {
+      aggregateRoot
+      - AttentionItemId id
+      String sessionId
+      - AttentionKind kind
+      - AttentionState lifecycle
+      long createdAt
+    }
+    ValueObject AttentionItemId { String value key }
+    /* APPROVAL points at an Authority CapabilityRequest; QUESTION carries an elicitation form. */
+    enum AttentionKind { APPROVAL, QUESTION }
+    enum AttentionState {
+      aggregateLifecycle
+      PENDING, ANSWERED, DECLINED, EXPIRED, CANCELLED
+    }
+    Entity Question {
+      String message
+      String formSchema
+      String answer
+    }
+  }
+}
+
+/* -------------------------------------------------------- CredentialBrokerage */
+
+BoundedContext CredentialBrokerage implements SecretHandling {
+  type = FEATURE
+  domainVisionStatement = "Resolve placeholders into real credentials at the egress boundary, only for holders of a secret capability."
+  responsibilities = "Secret references (secretspec)", "Placeholders", "Egress injection", "Provider accounts"
+
+  Aggregate SecretBinding {
+    Entity SecretBinding {
+      aggregateRoot
+      - SecretBindingId id
+      String secretRef
+      String placeholder
+      String allowedHosts
+      String capabilityId
+    }
+    ValueObject SecretBindingId { String value key }
+
+  }
+}
+
+/* -------------------------------------------------------------- SessionRecord */
+
+BoundedContext SessionRecord implements Audit {
+  type = FEATURE
+  domainVisionStatement = "Append-only record of every event, decision and grant; the source for transcripts and audits."
+  responsibilities = "Event log", "Replies-only transcript", "Audit trail"
+}
+
+/* ---------------------------------------------------------- External systems */
+
+BoundedContext Harnesses {
+  type = SYSTEM
+  domainVisionStatement = "omp, Claude Code, Codex, pi: agent loops we run but do not own."
+}
+
+BoundedContext ModelProviders {
+  type = SYSTEM
+  domainVisionStatement = "Anthropic, OpenAI, local models: reached only through the egress proxy."
+}
