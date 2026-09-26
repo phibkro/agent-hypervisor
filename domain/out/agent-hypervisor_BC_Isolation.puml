@@ -29,38 +29,46 @@ package "'Sandbox' Aggregate" <<Rectangle>> {
 	enum SandboxState {
 		PROVISIONING
 		RUNNING
-		SUSPENDED
+		STOPPED
 		DESTROYED
 	}
 	class SandboxProvisioned <<(E,#ff9f4b) Domain Event>> {
 		SandboxId sandbox
+		HostRef host
 	}
-	class SandboxSuspended <<(E,#ff9f4b) Domain Event>> {
-		String snapshot
+	class SandboxStopped <<(E,#ff9f4b) Domain Event>> {
 		SandboxId sandbox
 	}
 	class MountAttached <<(E,#ff9f4b) Domain Event>> {
 		SandboxId sandbox
 		Mount mount
 	}
+	class MountDetached <<(E,#ff9f4b) Domain Event>> {
+		SandboxId sandbox
+		Mount mount
+	}
 	class SandboxLifecycle <<(S,DarkSeaGreen) Service>> {
 		SandboxId provision(HostRef host)
 		void ready(SandboxId sandbox)
-		void suspend(SandboxId sandbox)
-		void resume(SandboxId sandbox)
+		void stop(SandboxId sandbox)
+		void start(SandboxId sandbox)
 		void destroy(SandboxId sandbox)
-		SandboxId cloneFromSnapshot(SandboxId sandbox)
+		void attachMount(SandboxId sandbox, Mount mount)
+		void detachMount(SandboxId sandbox, Mount mount)
 	}
 }
 Sandbox --> HostRef : host
 Sandbox --> SandboxState : lifecycle
 SandboxProvisioned --> SandboxId : sandbox
+SandboxProvisioned --> HostRef : host
 Sandbox --> SandboxId : id
 Sandbox "1" *--> "*" Mount : mounts
 MountAttached --> SandboxId : sandbox
+MountDetached --> Mount : mount
 Sandbox --> EgressPolicy : egress
-SandboxSuspended --> SandboxId : sandbox
+SandboxStopped --> SandboxId : sandbox
 MountAttached --> Mount : mount
+MountDetached --> SandboxId : sandbox
 legend left
   This bounded context implements the subdomain 'Isolation'.
 end legend

@@ -3,17 +3,16 @@
 skinparam componentStyle uml2
 
 RUNNING : 
-SUSPENDED : 
+STOPPED : 
 DESTROYED : 
 PROVISIONING : 
 [*] --> PROVISIONING : provision
 PROVISIONING --> RUNNING : ready
-RUNNING --> SUSPENDED : suspend
-SUSPENDED --> RUNNING : resume
+RUNNING --> STOPPED : stop
+STOPPED --> PROVISIONING : start
 RUNNING --> DESTROYED : destroy
-SUSPENDED --> DESTROYED : destroy
+STOPPED --> DESTROYED : destroy
 PROVISIONING --> DESTROYED : destroy
-[*] --> PROVISIONING : cloneFromSnapshot
 
 
 legend top center

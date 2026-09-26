@@ -25,6 +25,8 @@ package "'Session' Aggregate" <<Rectangle>> {
 		String repositoryResourceId
 		String branch
 		String worktreePath
+		String storageHostId
+		String baseCommit
 	}
 	class HarnessSessionRef <<(V,DarkSeaGreen) Value Object>> {
 		String harness
@@ -68,6 +70,11 @@ package "'Session' Aggregate" <<Rectangle>> {
 		TurnId id
 		SessionId session
 		StopReason stopReason
+		Checkpoint checkpoint
+	}
+	class Checkpoint <<(V,DarkSeaGreen) Value Object>> {
+		String commit
+		long takenAt
 	}
 	class TurnId <<(V,DarkSeaGreen) Value Object>> {
 		String value
@@ -104,6 +111,7 @@ package "'Session' Aggregate" <<Rectangle>> {
 	class SessionForked <<(E,#ff9f4b) Domain Event>> {
 		SessionId session
 		SessionId forkedFrom
+		TurnId fromTurn
 	}
 	class SessionWentInactive <<(E,#ff9f4b) Domain Event>> {
 		SessionId session
@@ -115,9 +123,10 @@ package "'Session' Aggregate" <<Rectangle>> {
 		SessionId start(ProjectId project, AgentProfileRef lead)
 		TurnId prompt(SessionId session, String message)
 		void cancel(SessionId session)
-		SessionId fork(SessionId session)
+		SessionId fork(SessionId session, TurnId fromTurn)
 		SessionId importFromHarness(ProjectId project, HarnessSessionRef ref)
 		void archive(SessionId session)
+		void unarchive(SessionId session)
 	}
 }
 SessionArchived --> SessionId : session
@@ -125,6 +134,7 @@ SubagentSpawned --> AgentId : parent
 SessionStarted --> SessionId : session
 Agent --> AgentObservation : observedVia
 Agent --> AgentId : id
+SessionForked --> TurnId : fromTurn
 SessionForked --> SessionId : session
 SessionWentInactive --> SessionId : session
 Session --> SessionFacts : facts
@@ -150,6 +160,7 @@ Session --> SandboxRef : sandbox
 SubagentSpawned --> SessionId : session
 TurnEnded --> StopReason : stopReason
 Agent --> AgentProfileRef : profile
+Turn --> Checkpoint : checkpoint
 TurnEnded --> SessionId : session
 
 

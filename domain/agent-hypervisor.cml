@@ -13,7 +13,15 @@
  * - The session's creator answers its capability requests.
  * Decided (round 3): single user for the MVP. The Owner holds root authority, owns every
  *   credential and answers every capability request, so no approver can lack the authority it grants.
- * Decided (round 4): merging worktrees back happens outside the system; one host for the MVP.
+ * Decided (round 4): merging worktrees back happens outside the system.
+ * Decided (round 5):
+ * - Multi-host by design (compute and storage roles), one host deployed for now.
+ * - A fork carries conversation, code and grants from a chosen turn into a new session with its own worktree.
+ * - Archive keeps the worktree and transcript; the VM is stopped, not snapshotted.
+ * - Capabilities can be granted (mounted) and revoked (unmounted) at any time, including mid-turn.
+ * - A session with a pending request never suspends; the request's own timeout ends it instead.
+ * Revised: "suspend" means stop the VM and keep durable state on the host, not a memory snapshot,
+ *   because Cloud Hypervisor snapshot/restore with virtio-fs mounts has open bugs (issues #6931, #8918).
  * - The agent tree is observed, best effort: recorded when a harness reports subagents.
  */
 
@@ -142,16 +150,18 @@ BoundedContext ProjectCatalog implements ProjectManagement {
     DomainEvent ProjectCreated { - ProjectId project }
   }
 
-  /* MVP: exactly one host, the machine running the control plane. Kept as an aggregate
-     so sessions can later be placed on several tailnet machines. */
+  /* Multi-host by design: sandboxes run on compute hosts; worktrees, transcripts and records
+     live on storage hosts. MVP: one host with both roles. */
   Aggregate Host {
     Entity Host {
       aggregateRoot
       - HostId id
       String name
       String tailnetAddress
+      - List<HostRole> roles
     }
     ValueObject HostId { String value key }
+    enum HostRole { COMPUTE, STORAGE }
   }
 }
 
@@ -184,6 +194,8 @@ BoundedContext SessionOrchestration implements SessionLifecycle {
       String repositoryResourceId
       String branch
       String worktreePath
+      String storageHostId
+      String baseCommit
     }
     /* The harness's own id for the conversation (omp JSONL, Claude Code JSONL, Codex rollout). */
     ValueObject HarnessSessionRef {
@@ -223,6 +235,14 @@ BoundedContext SessionOrchestration implements SessionLifecycle {
       long startedAt
       long endedAt
       - StopReason stopReason
+      - Checkpoint checkpoint
+    }
+    /* Code state when the turn started: a git commit of the worktree (tracked and untracked
+       files) that is not on any branch. Makes "fork from turn N" carry the code of turn N,
+       including changes made by shell commands and subagents. */
+    ValueObject Checkpoint {
+      String commit
+      long takenAt
     }
     ValueObject TurnId { String value key }
     enum StopReason { END_TURN, CANCELLED, ERROR, MAX_TOKENS, REFUSAL }
@@ -240,10 +260,15 @@ BoundedContext SessionOrchestration implements SessionLifecycle {
     DomainEvent TurnStarted { - SessionId session - TurnId turn }
     DomainEvent TurnEnded { - SessionId session - TurnId turn - StopReason stopReason }
     DomainEvent SessionArchived { - SessionId session }
-    DomainEvent SessionForked { - SessionId session - SessionId forkedFrom }
+    /* A fork is a new session (new principal, new worktree branched from the checkpoint)
+       carrying the conversation up to fromTurn and a copy of the source's grants.
+       Exclusive (iso) grants are not copied: the fork gets iso over its own worktree instead. */
+    DomainEvent SessionForked { - SessionId session - SessionId forkedFrom - TurnId fromTurn }
 
     /* Status is derived, so crossing the 15-minute threshold emits nothing by itself;
-       an idle watcher observes it and raises this event, which suspends the sandbox. */
+       an idle watcher observes it and raises this event, which stops the sandbox.
+       A session with a pending request is "needs-you", never inactive, so it never stops
+       while an agent waits; the request's own timeout resolves it. */
     DomainEvent SessionWentInactive { - SessionId session }
     DomainEvent SessionReactivated { - SessionId session }
 
@@ -251,9 +276,10 @@ BoundedContext SessionOrchestration implements SessionLifecycle {
       @SessionId start(@ProjectId project, @AgentProfileRef lead);
       @TurnId prompt(@SessionId session, String message);
       void cancel(@SessionId session);
-      @SessionId fork(@SessionId session);
+      @SessionId fork(@SessionId session, @TurnId fromTurn);
       @SessionId importFromHarness(@ProjectId project, @HarnessSessionRef ref);
       void archive(@SessionId session);
+      void unarchive(@SessionId session);
     }
   }
 }
@@ -399,21 +425,28 @@ BoundedContext Isolation implements Isolation {
       String proxyAddress
       String allowedHosts
     }
+    /* STOPPED: the VM is shut down; everything durable (worktree, harness transcript, record)
+       lives on the host, so resuming boots a fresh VM and the harness reloads its session.
+       Lost on stop: running processes inside the VM (dev servers, watchers). */
     enum SandboxState {
       aggregateLifecycle
-      PROVISIONING, RUNNING, SUSPENDED, DESTROYED
+      PROVISIONING, RUNNING, STOPPED, DESTROYED
     }
-    DomainEvent SandboxProvisioned { - SandboxId sandbox }
-    DomainEvent SandboxSuspended { - SandboxId sandbox String snapshot }
+    DomainEvent SandboxProvisioned { - SandboxId sandbox - HostRef host }
+    DomainEvent SandboxStopped { - SandboxId sandbox }
+    /* Mounts follow capabilities at any time: grant hot-plugs a virtio-fs device (add-fs),
+       revoke unplugs it (remove-device). Changes to a STOPPED sandbox apply at next boot. */
     DomainEvent MountAttached { - SandboxId sandbox - Mount mount }
+    DomainEvent MountDetached { - SandboxId sandbox - Mount mount }
 
     Service SandboxLifecycle {
       @SandboxId provision(@HostRef host) : write [ -> PROVISIONING ];
       void ready(@SandboxId sandbox) : write [ PROVISIONING -> RUNNING ];
-      void suspend(@SandboxId sandbox) : write [ RUNNING -> SUSPENDED ];
-      void resume(@SandboxId sandbox) : write [ SUSPENDED -> RUNNING ];
-      void destroy(@SandboxId sandbox) : write [ PROVISIONING, RUNNING, SUSPENDED -> DESTROYED ];
-      @SandboxId cloneFromSnapshot(@SandboxId sandbox) : write [ -> PROVISIONING ];
+      void stop(@SandboxId sandbox) : write [ RUNNING -> STOPPED ];
+      void start(@SandboxId sandbox) : write [ STOPPED -> PROVISIONING ];
+      void destroy(@SandboxId sandbox) : write [ PROVISIONING, RUNNING, STOPPED -> DESTROYED ];
+      void attachMount(@SandboxId sandbox, @Mount mount);
+      void detachMount(@SandboxId sandbox, @Mount mount);
     }
   }
 }
