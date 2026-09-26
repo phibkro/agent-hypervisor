@@ -5,7 +5,11 @@ import tailwindcss from '@tailwindcss/vite';
 import { fumadocsMdx } from 'fumadocs-mdx/vite';
 import { nitro } from 'nitro/vite';
 
+// GitHub Pages serves a project site under /<repo>/; BASE_PATH is set by CI ("/agent-hypervisor/").
+const base = process.env.BASE_PATH ?? '/';
+
 export default defineConfig({
+  base,
   server: {
     port: 3000,
   },

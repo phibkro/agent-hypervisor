@@ -1,0 +1,4 @@
+{
+  "title": "Domain model",
+  "pages": ["index", "agent-work", "authority", "secrets", "isolation"]
+}

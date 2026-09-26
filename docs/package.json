@@ -4,27 +4,34 @@
   "type": "module",
   "sideEffects": false,
   "scripts": {
-    "dev": "vite dev",
-    "build": "vite build",
+    "dev": "test -f src/generated/domain.json || bun scripts/artifacts.ts --skip-alloy; vite dev",
+    "build": "bun scripts/artifacts.ts && vite build && cp .output/public/_shell.html .output/public/404.html",
     "start": "serve .output/public --config ../../serve.json",
     "preview": "vite preview",
-    "types:check": "tsc --noEmit"
+    "types:check": "tsc --noEmit && tsc --noEmit -p scripts",
+    "artifacts": "bun scripts/artifacts.ts"
   },
   "dependencies": {
     "@tanstack/react-router": "1.170.38",
     "@tanstack/react-router-devtools": "1.167.2",
     "@tanstack/react-start": "1.168.56",
+    "@tanstack/start-client-core": "1.170.32",
     "@tanstack/start-static-server-functions": "1.167.37",
     "cn": "^0.3.0",
     "fumadocs-core": "16.15.14",
     "fumadocs-mdx": "15.4.5",
     "fumadocs-ui": "npm:@fumadocs/base-ui@16.15.14",
     "lucide-react": "^1.47.0",
+    "mermaid": "^12.0.0",
+    "motion": "^13.4.4",
+    "next-themes": "^0.4.6",
     "react": "^19.3.0",
-    "react-dom": "^19.3.0"
+    "react-dom": "^19.3.0",
+    "seroval": "^1.6.7"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.3",
+    "@types/bun": "^1.4.2",
     "@types/mdx": "^2.0.14",
     "@types/node": "^26.6.1",
     "@types/react": "^19.3.0",

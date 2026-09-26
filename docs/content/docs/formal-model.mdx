@@ -1,0 +1,48 @@
+---
+title: "Formal model"
+description: "Alloy checks of the invariants the control plane must keep, run on every build."
+icon: ShieldCheck
+---
+
+[`spec/capabilities.als`](https://github.com/phibkro/agent-hypervisor/blob/main/spec/capabilities.als) models
+capabilities, sandbox mounts, pending requests and forks, following the [domain model](/docs/domain). The build runs
+every check at the base scope and fails if any outcome differs from what the model expects.
+
+## Results
+
+<AlloyResults />
+
+## What the counterexamples changed
+
+Four counterexamples from the first runs changed the design:
+
+1. **Issuing a root checks both directions.** An exclusive root needs no live shared capability on the resource,
+   and a shared root no live exclusive one.
+2. **Mounts follow every loss of authority, synchronously.** Revoking is not the only loss: freezing iso into val
+   removes write authority too. A revoke or freeze completes only after the sandbox has detached or downgraded the
+   affected mounts.
+3. **Freeze in place.** Only a capability's holder turns it from exclusive into shared. A project freezes its own,
+   then hands out shared copies, which forks can later receive.
+4. **A fork carries exactly the project-issued grants.** Grants a session derived from its own exclusive
+   capability stay with it.
+
+## The unsafe window
+
+With lazy unmounting, a revoked session keeps its mount for a while. This check is expected to fail; its
+counterexample is kept as documentation:
+
+<AlloyTrace command="MountsAreBacked" />
+
+## Reachability
+
+The checks are not vacuous: the model can reach a write mount followed by a revocation, and a fork.
+
+<Tabs items={['WriteMountThenRevoke', 'ForkHappens']}>
+  <Tab><AlloyTrace command="WriteMountThenRevoke" /></Tab>
+  <Tab><AlloyTrace command="ForkHappens" /></Tab>
+</Tabs>
+
+## Limits
+
+Bounded model checking: no counterexample within the scope, not a proof. Rights are sets of atoms (no lattice), and
+hosts, secrets and the harness are not modelled yet.

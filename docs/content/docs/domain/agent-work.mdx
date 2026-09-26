@@ -1,0 +1,34 @@
+---
+title: "Agent work"
+description: "Sessions, their turns and agents, and the code they work on."
+---
+
+<BoundedContextDiagram name="AgentWork" />
+
+## Session
+
+A session is the unit of agent work and the security principal. It stores three states, and derives two labels:
+"needs you" (a request is pending) and "inactive" (15 quiet minutes). Writing the flow showed that nothing about
+the session changes when it goes quiet; only its sandbox stops, so inactivity is an [Isolation](/docs/domain/isolation) rule.
+
+<Lifecycle context="AgentWork" flow="SessionLifecycle" />
+
+<Aggregate context="AgentWork" name="Session" />
+
+## Forks
+
+A fork is a new session: the conversation up to a chosen turn, a new worktree branched from that turn's
+checkpoint, and fresh copies of the grants the project issued to the source. Exclusive grants are not copied; the
+fork gets exclusive write over its own worktree instead. The [formal model](/docs/formal-model) checks that a fork
+carries exactly these grants.
+
+## Projects and agent profiles
+
+<Tabs items={['Project', 'AgentProfile']}>
+  <Tab><Aggregate context="AgentWork" name="Project" /></Tab>
+  <Tab><Aggregate context="AgentWork" name="AgentProfile" /></Tab>
+</Tabs>
+
+## In CML
+
+<include cwd lang="cml" meta='title="BoundedContext AgentWork"'>../domain/agent-hypervisor.cml#agent-work</include>

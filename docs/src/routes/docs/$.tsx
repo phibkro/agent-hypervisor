@@ -12,7 +12,7 @@ import {
 } from 'fumadocs-ui/layouts/docs/page';
 import { baseOptions } from '@/lib/layout.shared';
 import { getPageMarkdownUrl, gitConfig } from '@/lib/shared';
-import { staticFunctionMiddleware } from '@tanstack/start-static-server-functions';
+import { staticFunctionMiddleware } from '@/lib/static-function-middleware';
 import { useFumadocsLoader } from 'fumadocs-core/source/client';
 import { Suspense, use } from 'react';
 import { useMDXComponents } from '@/components/mdx';
@@ -58,7 +58,7 @@ function Content({ path, markdownUrl }: { path: string; markdownUrl: string }) {
         <MarkdownCopyButton markdownUrl={markdownUrl} />
         <ViewOptionsPopover
           markdownUrl={markdownUrl}
-          githubUrl={`https://github.com/${gitConfig.user}/${gitConfig.repo}/blob/${gitConfig.branch}/content/docs/${path}`}
+          githubUrl={`https://github.com/${gitConfig.user}/${gitConfig.repo}/blob/${gitConfig.branch}/${gitConfig.dir}/content/docs/${path}`}
         />
       </div>
       <DocsBody>

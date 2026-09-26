@@ -10,6 +10,7 @@
 
 /* ======================================================= who does what, and why */
 
+//#region stories
 UserStory StartSession {
   As an "Owner"
     I want to "start" a "Session" in a "Project"
@@ -93,9 +94,11 @@ UserStory DelegateToSubagent {
     I want to "spawn" a "Subagent" in a "Session"
   so that "I can split a task without asking for new authority"
 }
+//#endregion
 
 /* ======================================================= the problem space */
 
+//#region domain
 Domain AgentHypervisor {
   domainVisionStatement = "Run any coding agent with exactly the authority its task needs, and supervise it from anywhere."
 
@@ -136,9 +139,11 @@ Domain AgentHypervisor {
     Entity Host { String name }
   }
 }
+//#endregion
 
 /* ======================================================= the solution space */
 
+//#region context-map
 ContextMap AgentHypervisorMap {
   type = SYSTEM_LANDSCAPE
   state = TO_BE
@@ -152,7 +157,9 @@ ContextMap AgentHypervisorMap {
   /* Work tells isolation what should run; isolation serves it. */
   Isolation [S] -> [C] AgentWork
 }
+//#endregion
 
+//#region agent-work
 BoundedContext AgentWork implements AgentWork {
   type = FEATURE
   domainVisionStatement = "Sessions, their turns and agents, and the code they work on."
@@ -274,7 +281,9 @@ BoundedContext AgentWork implements AgentWork {
     }
   }
 }
+//#endregion
 
+//#region authority
 BoundedContext Authority implements Authority {
   type = FEATURE
   domainVisionStatement = "Capabilities (iso, val, tag) over resources, held by principals that follow containment: Owner > Project > Session."
@@ -349,7 +358,9 @@ BoundedContext Authority implements Authority {
     DomainEvent RequestCancelled { String request }
   }
 }
+//#endregion
 
+//#region secrets
 BoundedContext Secrets implements Secrets {
   type = FEATURE
   domainVisionStatement = "The owner's secrets; a session sees a placeholder, and the real value is substituted only on the way out of the sandbox."
@@ -371,7 +382,9 @@ BoundedContext Secrets implements Secrets {
     }
   }
 }
+//#endregion
 
+//#region isolation
 BoundedContext Isolation implements Isolation {
   type = FEATURE
   domainVisionStatement = "One sandbox per session on a compute host; mounts and egress rules are the physical form of capabilities."
@@ -423,3 +436,4 @@ BoundedContext Isolation implements Isolation {
     }
   }
 }
+//#endregion

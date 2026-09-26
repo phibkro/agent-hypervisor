@@ -1,0 +1,32 @@
+---
+title: "Isolation"
+description: "One sandbox per session on a compute host; mounts and egress rules are the physical form of capabilities."
+---
+
+<BoundedContextDiagram name="Isolation" />
+
+## Sandbox
+
+A sandbox is a Cloud Hypervisor microVM. Stopping it keeps nothing in memory: the worktree, the harness transcript
+and the record live on the host, so resuming boots a fresh VM and the harness reloads its session. Snapshots are a
+later optimisation; restoring VMs with virtio-fs mounts has open upstream issues.
+
+The idle rule lives here: after 15 minutes without activity from the owner or any agent, the sandbox stops,
+unless a request is pending.
+
+<Lifecycle context="Isolation" flow="SandboxLifecycle" />
+
+## Mounts follow capabilities
+
+A directory capability becomes a virtio-fs mount, hot-plugged when granted and removed when revoked. The
+[formal model](/docs/formal-model) showed this must happen in the same step as any loss of authority (revoking,
+and also freezing iso into val), not lazily afterwards.
+
+<Tabs items={['Sandbox', 'Host']}>
+  <Tab><Aggregate context="Isolation" name="Sandbox" /></Tab>
+  <Tab><Aggregate context="Isolation" name="Host" /></Tab>
+</Tabs>
+
+## In CML
+
+<include cwd lang="cml" meta='title="BoundedContext Isolation"'>../domain/agent-hypervisor.cml#isolation</include>
